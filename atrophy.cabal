@@ -1,0 +1,43 @@
+cabal-version: 2.4
+name: atrophy
+version: 0.1.0.0
+synopsis:
+homepage:
+license: MIT
+license-file: LICENSE
+author: Zachary Churchill
+maintainer: zacharyachurchill@gmail.com
+category: Math
+extra-source-files: CHANGELOG.md
+
+library
+  exposed-modules: 
+      Atrophy
+    , Atrophy.LongDivision
+    , Atrophy.LongMultiplication
+  -- other-modules: 
+  -- other-extensions:
+  build-depends: 
+      base >=4.10.0.0
+    , wide-word
+    , contiguous >= 0.6.0.0
+  hs-source-dirs: src
+  default-language: Haskell2010
+
+test-suite atrophy-test
+  default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  hs-source-dirs: tests
+  main-is: Main.hs
+  build-depends: 
+      base >=4.10.0.0
+    , wide-word
+    , contiguous >= 0.6.0.0
+    , HUnit
+    , tasty
+    , QuickCheck
+    , quickcheck-classes
+    , tasty
+    , tasty-hunit
+    , tasty-quickcheck
+    , atrophy
