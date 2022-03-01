@@ -23,6 +23,7 @@ tests =
 instance Arbitrary Word128 where
   arbitrary = Word128 <$> arbitrary <*> arbitrary
 
+-- wrong
 naiveMultiply256By128UpperBits :: Word128 -> Word128 -> Word128 -> Word128
 naiveMultiply256By128UpperBits aHi aLo b =
   let 
@@ -33,12 +34,13 @@ naiveMultiply256By128UpperBits aHi aLo b =
       , word256lo = word128Lo64 aLo
       }
     b' = Word256
-      { word256hi = 0
-      , word256m1 = 0
-      , word256m0 = word128Hi64 b
-      , word256lo = word128Lo64 b
+      { word256hi = word128Hi64 b
+      , word256m1 = word128Lo64 b
+      , word256m0 = 0
+      , word256lo = 0
       }
-  in fromIntegral (a' * b')
+    Word256 h l _ _ = a' * b'
+  in Word128 h l
 
 unitTests :: TestTree
 unitTests = testGroup "Unit tests"
@@ -46,45 +48,6 @@ unitTests = testGroup "Unit tests"
       [ testProperty "multiply256By128UpperBits" $ equivalentOnArbitrary3 multiply256By128UpperBits naiveMultiply256By128UpperBits
       ]
   ]
-
-equivalentOnGen ::
-       (Show a, Show b, Eq b)
-    => (a -> b)
-    -> (a -> b)
-    -> Gen a
-    -> (a -> [a])
-    -> Property
-equivalentOnGen f g gen s = forAllShrink gen s $ \a -> f a === g a
-
--- |
---
--- prop> equivalentOnArbitrary ((* 2) . (+ 1)) ((+ 2) . (* 2) :: Int -> Int)
-equivalentOnArbitrary ::
-       (Show a, Arbitrary a, Show b, Eq b)
-    => (a -> b)
-    -> (a -> b)
-    -> Property
-equivalentOnArbitrary f g = equivalentOnGen f g arbitrary shrink
-
-equivalentOnGens2 ::
-       (Show a, Show b, Show c, Eq c)
-    => (a -> b -> c)
-    -> (a -> b -> c)
-    -> Gen (a, b)
-    -> ((a, b) -> [(a, b)])
-    -> Property
-equivalentOnGens2 f g gen s =
-    forAllShrink gen s $ \(a, b) -> f a b === g a b
-
--- |
---
--- prop> equivalentOnArbitrary2 (+) ((+) :: Int -> Int -> Int)
-equivalentOnArbitrary2 ::
-       (Show a, Arbitrary a, Show b, Arbitrary b, Show c, Eq c)
-    => (a -> b -> c)
-    -> (a -> b -> c)
-    -> Property
-equivalentOnArbitrary2 f g = equivalentOnGens2 f g arbitrary shrink
 
 equivalentOnGens3 ::
        (Show a, Show b, Show c, Show d, Eq d)
