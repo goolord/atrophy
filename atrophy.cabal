@@ -17,6 +17,7 @@ library
     , Atrophy.LongMultiplication
   other-modules: 
       Atrophy.Internal
+      Atrophy.Internal.LongDivision
   -- other-extensions:
   ghc-options: -Wall
   build-depends: 

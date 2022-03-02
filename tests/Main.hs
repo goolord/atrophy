@@ -1,16 +1,19 @@
 {-# LANGUAGE TypeOperators #-}
+
+{-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
+
 module Main (main) where
 
-import Data.Proxy
 import Test.QuickCheck
-import Test.QuickCheck.Classes
 import Test.Tasty
 import Test.Tasty.QuickCheck
 import Data.WideWord.Word128
 import Data.WideWord.Word256
-import Data.Word
 import Atrophy
-import Atrophy.LongMultiplication (multiply256By128UpperBits)
+import Data.Bits
+import Data.Word
 
 main :: IO ()
 main = do
@@ -45,31 +48,69 @@ naiveMultiply256By128UpperBits aHi aLo b =
 unitTests :: TestTree
 unitTests = testGroup "Unit tests"
   [ testGroup "Long multiplication" 
-      [ testProperty "multiply256By128UpperBits" $ equivalentOnArbitrary3 multiply256By128UpperBits naiveMultiply256By128UpperBits
+      [ -- testProperty "multiply256By128UpperBits" $ equivalentOnArbitrary3 multiply256By128UpperBits naiveMultiply256By128UpperBits
+      ]
+  , testGroup "Long division"
+      [ testGroup "StrengthReducedW64" [
+          testProperty "div" $ equivalentOnArbitrary2 ourDiv theirDiv
+        ]
       ]
   ]
 
+ourDiv :: (Bits a2, Integral a2) =>
+  NonZero a2 -> NonZero Word64 -> a2
+ourDiv (NonZero dividend) (NonZero divi) =
+  let sr = new StrengthReducedW64 divi
+  in div' dividend sr
+
+theirDiv :: Integral a => NonZero a -> NonZero a -> a
+theirDiv (NonZero dividend) (NonZero divi) =
+  dividend `div` divi
+
+equivalentOnGens2 ::
+     (Show a, Show b, Show d, Eq d)
+  => (a -> b -> d)
+  -> (a -> b -> d)
+  -> Gen (a, b)
+  -> ((a, b) -> [(a, b)])
+  -> Property
+equivalentOnGens2 f g gen s =
+    forAllShrink gen s $ \(a, b) -> f a b === g a b
+
+equivalentOnArbitrary2 ::
+     ( Show a
+     , Arbitrary a
+     , Show b
+     , Arbitrary b
+     , Show d
+     , Eq d
+     )
+  => (a -> b -> d)
+  -> (a -> b -> d)
+  -> Property
+equivalentOnArbitrary2 f g = equivalentOnGens2 f g arbitrary shrink
+
 equivalentOnGens3 ::
-       (Show a, Show b, Show c, Show d, Eq d)
-    => (a -> b -> c -> d)
-    -> (a -> b -> c -> d)
-    -> Gen (a, b, c)
-    -> ((a, b, c) -> [(a, b, c)])
-    -> Property
+     (Show a, Show b, Show c, Show d, Eq d)
+  => (a -> b -> c -> d)
+  -> (a -> b -> c -> d)
+  -> Gen (a, b, c)
+  -> ((a, b, c) -> [(a, b, c)])
+  -> Property
 equivalentOnGens3 f g gen s =
     forAllShrink gen s $ \(a, b, c) -> f a b c === g a b c
 
 equivalentOnArbitrary3 ::
-       ( Show a
-       , Arbitrary a
-       , Show b
-       , Arbitrary b
-       , Show c
-       , Arbitrary c
-       , Show d
-       , Eq d
-       )
-    => (a -> b -> c -> d)
-    -> (a -> b -> c -> d)
-    -> Property
+     ( Show a
+     , Arbitrary a
+     , Show b
+     , Arbitrary b
+     , Show c
+     , Arbitrary c
+     , Show d
+     , Eq d
+     )
+  => (a -> b -> c -> d)
+  -> (a -> b -> c -> d)
+  -> Property
 equivalentOnArbitrary3 f g = equivalentOnGens3 f g arbitrary shrink

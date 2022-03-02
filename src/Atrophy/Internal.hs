@@ -1,15 +1,19 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE 
+    CPP 
+  , TypeApplications
+  , DataKinds
+  , FlexibleContexts
+  , DuplicateRecordFields
+#-}
 
 module Atrophy.Internal where
 
 import Data.WideWord.Word128
 import Data.Bits
-import Atrophy.LongDivision
+import Atrophy.Internal.LongDivision
 import Control.Exception (assert)
 import GHC.Records
+import Data.Word
 
 {-# INLINE isPowerOf2 #-}
 isPowerOf2 :: (Bits a, Num a) => a -> Bool
@@ -19,13 +23,13 @@ type Con t a = (Word128 -> t -> a)
 
 {-# INLINE new #-}
 new :: (Bits t, Integral t) => Con t a -> t -> a
-new con divisor =
-  assert (divisor > 0) $
-  if isPowerOf2 divisor
-  then con 0 divisor
+new con divi =
+  assert (divi > 0) $
+  if isPowerOf2 divi
+  then con 0 divi
   else
-    let quotient = divide128MaxBy64 $ fromIntegral divisor
-    in con (quotient + 1) divisor
+    let quotient = divide128MaxBy64 $ fromIntegral divi
+    in con (quotient + 1) divi
 
 divRem :: (HasField "divisor" r b, HasField "multiplier" r Word128, Num b, Integral b, FiniteBits b) 
   => b -> r -> (b, b)
@@ -69,3 +73,7 @@ rem' a rhs =
 
 lower128 :: Word128 -> Word128
 lower128 = fromIntegral @_ @Word128 . word128Lo64
+
+data StrengthReducedW64 = StrengthReducedW64 { multiplier :: Word128, divisor :: Word64 }
+data StrengthReducedW32 = StrengthReducedW32 { multiplier :: Word64, divisor :: Word32 }
+data StrengthReducedW16 = StrengthReducedW16 { multiplier :: Word32, divisor :: Word16 }
