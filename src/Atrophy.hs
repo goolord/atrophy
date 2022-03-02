@@ -1,9 +1,13 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 
-module Atrophy where
+module Atrophy
+  ( module REXPORT
+  , StrengthReducedW128 (..)
+  , StrengthReducedW8 (..)
+  ) where
 
-import Atrophy.LongDivision
-import Atrophy.LongMultiplication
+import Atrophy.LongDivision as REXPORT
+import Atrophy.LongMultiplication as REXPORT
 import Data.WideWord.Word128
 import Data.Word
 
@@ -13,7 +17,7 @@ data StrengthReducedW8 = StrengthReducedW8
   }
 
 data StrengthReducedW128 = StrengthReducedW128
-  { multiplier_hi :: Word128
-  , multiplier_lo :: Word128
+  { multiplierHi :: Word128
+  , multiplierLo :: Word128
   , divisor :: Word128
   }
