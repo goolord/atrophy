@@ -2,9 +2,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
 
-{-# OPTIONS_GHC -Wno-unused-imports #-}
-{-# OPTIONS_GHC -Wno-unused-matches #-}
-{-# OPTIONS_GHC -Wno-unused-local-binds #-}
 {-# LANGUAGE NumericUnderscores #-}
 
 module Atrophy.LongDivision 
@@ -13,20 +10,15 @@ module Atrophy.LongDivision
   )
   where
 
-import Data.WideWord.Word128
 import Data.Word
 import Atrophy.Internal.LongDivision as X
 import Atrophy.Internal
 import qualified Data.Primitive.Contiguous as Contiguous
-import Data.Primitive.Contiguous (SmallArray, Slice, Mutable, MutableSliced, Sliced)
-import Control.Monad.ST.Strict (ST, runST)
-import Data.STRef.Strict (newSTRef, modifySTRef, readSTRef, writeSTRef)
+import Data.Primitive.Contiguous (SmallArray, Mutable, Sliced)
+import Control.Monad.ST.Strict (ST)
+import Data.STRef.Strict (newSTRef, readSTRef, writeSTRef)
 import Data.Bits
 import Data.Foldable (for_)
-import Data.Functor ((<&>))
-
-divide128By64PreshiftedReduced :: Word64 -> Word64 -> StrengthReducedW64 -> Word64 -> Word64
-divide128By64PreshiftedReduced numeratorHi numeratorLo divisorHi divisorFull = undefined
 
 {-# NOINLINE longDivision #-}
 longDivision :: forall s. Sliced SmallArray Word64 -> StrengthReducedW64 -> Mutable SmallArray s Word64 -> ST s ()
@@ -35,7 +27,6 @@ longDivision numeratorSlice reducedDivisor quotient = do
   let numeratorSliceSize = Contiguous.size numeratorSlice
   for_ [numeratorSliceSize - 1, numeratorSliceSize - 2 .. 0] $ \i -> do
     let numeratorElement = Contiguous.index numeratorSlice i
-    quotientElement <- Contiguous.read quotient i
     remainder' <- readSTRef remainder
     if remainder' > 0 
     then do
