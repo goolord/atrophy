@@ -41,12 +41,13 @@ divRem numerator denom =
       let
         numerator128 = fromIntegral @_ @Word128 numerator
         multipliedHi = numerator128 * (multiplier' `unsafeShiftR` 64)
-        multipliedLo = numerator128 * (lower128 multiplier') `unsafeShiftR` 64
+        multipliedLo = (numerator128 * (lower128 multiplier')) `unsafeShiftR` 64
 
         quotient = fromIntegral ((multipliedHi + multipliedLo) `unsafeShiftR` 64)
         remainder = numerator - quotient * getField @"divisor" denom
       in (quotient, remainder)
 
+{-# INLINE div' #-}
 div' :: (FiniteBits b, HasField "divisor" r b, HasField "multiplier" r a1,
  Num a1, Bits a2, Eq a1, Integral a2,
  HasField "multiplier" r Word128) => a2 -> r -> a2
@@ -57,9 +58,14 @@ div' a rhs =
       let
         numerator = fromIntegral a
         multipliedHi = numerator * (multiplier' `unsafeShiftR` 64)
-        multipliedLo = numerator * (lower128 multiplier') `unsafeShiftR` 64
+        multipliedLo = (numerator * (lower128 multiplier')) `unsafeShiftR` 64
       in fromIntegral ((multipliedHi + multipliedLo) `unsafeShiftR` 64)
 
+test :: IO ()
+test = do
+  print (div' 81 (new StrengthReducedW64 27) :: Word64)
+
+{-# INLINE rem' #-}
 rem' :: (Num a2, HasField "divisor" r a1, HasField "multiplier" r a2,
  Eq a2, HasField "divisor" r b, HasField "multiplier" r Word128,
  Integral a1, FiniteBits b, Bits a1) =>
@@ -71,6 +77,7 @@ rem' a rhs =
       let quotient = a `div'` rhs
       in a - quotient * getField @"divisor" rhs
 
+{-# INLINE lower128 #-}
 lower128 :: Word128 -> Word128
 lower128 = fromIntegral @_ @Word128 . word128Lo64
 
