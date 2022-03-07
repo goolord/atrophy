@@ -27,23 +27,22 @@ longDivision numeratorSlice reducedDivisor quotient = do
   let numeratorSliceSize = Contiguous.size numeratorSlice
   for_ [numeratorSliceSize - 1, numeratorSliceSize - 2 .. 0] $ \i -> do
     let numeratorElement = Contiguous.index numeratorSlice i
-    remainder' <- readSTRef remainder
-    if remainder' > 0 
-    then do
-      -- Do one division that includes the running remainder and the upper half of this numerator element, 
-      -- then a second division for the first division's remainder combinedwith the lower half
-      let upperNumerator = (remainder' `shiftL` 32) .|. (numeratorElement `shiftR` 32)
-      let (upperQuotient, upperRemainder) = divRem upperNumerator reducedDivisor
+    readSTRef remainder >>= \case
+      0 -> do
+        -- The remainder is zero, which means we can take a shortcut and only do a single division!
+        let (digitQuotient, digitRemainder) = divRem numeratorElement reducedDivisor
 
-      let lowerNumerator = (upperRemainder `shiftL` 32) .|. (0x00000000_ffffffff .&. numeratorElement)
-      let (lowerQuotient, lowerRemainder) = divRem lowerNumerator reducedDivisor
+        Contiguous.write quotient i digitQuotient
+        writeSTRef remainder digitRemainder
 
-      Contiguous.write quotient i $ (upperQuotient `shiftL` 32) .|. lowerQuotient
-      writeSTRef remainder lowerRemainder
-    else do
-      -- The remainder is zero, which means we can take a shortcut and only do a single division!
-      let (digitQuotient, digitRemainder) = divRem numeratorElement reducedDivisor
+      remainder' -> do
+        -- Do one division that includes the running remainder and the upper half of this numerator element, 
+        -- then a second division for the first division's remainder combinedwith the lower half
+        let upperNumerator = (remainder' `shiftL` 32) .|. (numeratorElement `shiftR` 32)
+        let (upperQuotient, upperRemainder) = divRem upperNumerator reducedDivisor
 
-      Contiguous.write quotient i digitQuotient
-      writeSTRef remainder digitRemainder
+        let lowerNumerator = (upperRemainder `shiftL` 32) .|. (0x00000000_ffffffff .&. numeratorElement)
+        let (lowerQuotient, lowerRemainder) = divRem lowerNumerator reducedDivisor
 
+        Contiguous.write quotient i $ (upperQuotient `shiftL` 32) .|. lowerQuotient
+        writeSTRef remainder lowerRemainder
