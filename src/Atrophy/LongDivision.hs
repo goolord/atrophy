@@ -38,11 +38,11 @@ longDivision numeratorSlice reducedDivisor quotient = do
       remainder' -> do
         -- Do one division that includes the running remainder and the upper half of this numerator element, 
         -- then a second division for the first division's remainder combinedwith the lower half
-        let upperNumerator = (remainder' `shiftL` 32) .|. (numeratorElement `shiftR` 32)
+        let upperNumerator = (remainder' `unsafeShiftL` 32) .|. (numeratorElement `unsafeShiftR` 32)
         let (upperQuotient, upperRemainder) = divRem upperNumerator reducedDivisor
 
-        let lowerNumerator = (upperRemainder `shiftL` 32) .|. (0x00000000_ffffffff .&. numeratorElement)
+        let lowerNumerator = (upperRemainder `unsafeShiftL` 32) .|. (0x00000000_ffffffff .&. numeratorElement)
         let (lowerQuotient, lowerRemainder) = divRem lowerNumerator reducedDivisor
 
-        Contiguous.write quotient i $ (upperQuotient `shiftL` 32) .|. lowerQuotient
+        Contiguous.write quotient i $ (upperQuotient `unsafeShiftL` 32) .|. lowerQuotient
         writeSTRef remainder lowerRemainder

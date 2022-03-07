@@ -36,14 +36,14 @@ divRem :: (HasField "divisor" r b, HasField "multiplier" r Word128, Num b, Integ
 divRem numerator denom =
   case getField @"multiplier" denom of
     0 ->
-      (numerator `shiftR` (countTrailingZeros $ getField @"divisor" denom), numerator .&. (getField @"divisor" denom - 1))
+      (numerator `unsafeShiftR` (countTrailingZeros $ getField @"divisor" denom), numerator .&. (getField @"divisor" denom - 1))
     multiplier' ->
       let
         numerator128 = fromIntegral @_ @Word128 numerator
-        multipliedHi = numerator128 * (multiplier' `shiftR` 64)
-        multipliedLo = numerator128 * (lower128 multiplier') `shiftR` 64
+        multipliedHi = numerator128 * (multiplier' `unsafeShiftR` 64)
+        multipliedLo = numerator128 * (lower128 multiplier') `unsafeShiftR` 64
 
-        quotient = fromIntegral ((multipliedHi + multipliedLo) `shiftR` 64)
+        quotient = fromIntegral ((multipliedHi + multipliedLo) `unsafeShiftR` 64)
         remainder = numerator - quotient * getField @"divisor" denom
       in (quotient, remainder)
 
@@ -52,13 +52,13 @@ div' :: (FiniteBits b, HasField "divisor" r b, HasField "multiplier" r a1,
  HasField "multiplier" r Word128) => a2 -> r -> a2
 div' a rhs =
   case getField @"multiplier" rhs of 
-    0 -> a `shiftR` (countTrailingZeros (getField @"divisor" rhs))
+    0 -> a `unsafeShiftR` (countTrailingZeros (getField @"divisor" rhs))
     multiplier' ->
       let
         numerator = fromIntegral a
-        multipliedHi = numerator * (multiplier' `shiftR` 64)
-        multipliedLo = numerator * (lower128 multiplier') `shiftR` 64
-      in fromIntegral ((multipliedHi + multipliedLo) `shiftR` 64)
+        multipliedHi = numerator * (multiplier' `unsafeShiftR` 64)
+        multipliedLo = numerator * (lower128 multiplier') `unsafeShiftR` 64
+      in fromIntegral ((multipliedHi + multipliedLo) `unsafeShiftR` 64)
 
 rem' :: (Num a2, HasField "divisor" r a1, HasField "multiplier" r a2,
  Eq a2, HasField "divisor" r b, HasField "multiplier" r Word128,

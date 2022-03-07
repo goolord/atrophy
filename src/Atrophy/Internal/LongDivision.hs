@@ -25,15 +25,15 @@ import Data.Functor ((<&>))
 divide128By64Preshifted :: Word64 -> Word64 -> Word64 -> Word64
 divide128By64Preshifted numeratorHi numeratorLo' divisor = runST $ do
   let
-    numeratorMid = fromIntegral @Word64 @Word128 (numeratorLo' `shiftR` 32)
+    numeratorMid = fromIntegral @Word64 @Word128 (numeratorLo' `unsafeShiftR` 32)
     numeratorLo = fromIntegral @Word32 @Word128 (fromIntegral @Word64 @Word32 numeratorLo')
     divisorFull128 = fromIntegral @Word64 @Word128 divisor
-    divisorHi = divisor `shiftR` 32
+    divisorHi = divisor `unsafeShiftR` 32
 
     -- To get the upper 32 bits of the quotient, we want to divide 'fullUpperNumerator' by 'divisor'
     -- but the problem is, fullUpperNumerator is a 96-bit number, meaning we would need to use u128 to do the division all at once, and the whole point of this is that we don't want to do 128 bit divison because it's slow
     -- so instead, we'll shift both the numerator and divisor right by 32, giving us a 64 bit / 32 bit division. This won't give us the exact quotient -- but it will be close.
-    fullUpperNumerator = (Word128 0 numeratorHi `shiftL` 32) .|. numeratorMid
+    fullUpperNumerator = (Word128 0 numeratorHi `unsafeShiftL` 32) .|. numeratorMid
     quotientHi' = min (numeratorHi `div` divisorHi) (fromIntegral $ maxBound @Word32)
   quotientHi <- newSTRef quotientHi'
   productHi <- newSTRef $ (Word128 0 quotientHi') * divisorFull128
@@ -47,7 +47,7 @@ divide128By64Preshifted numeratorHi numeratorLo' divisor = runST $ do
   remainderHi <- readSTRef productHi <&> ((-) fullUpperNumerator)
 
   -- repeat the process using the lower half of the numerator
-  let fullLowerNumerator = (remainderHi `shiftL` 32) .|. numeratorLo
+  let fullLowerNumerator = (remainderHi `unsafeShiftL` 32) .|. numeratorLo
 
   quotientLo <- newSTRef $ min ((fromIntegral @_ @Word64 remainderHi) `div` divisorHi) (fromIntegral $ maxBound @Word32)
   productLo  <- do 
@@ -62,7 +62,7 @@ divide128By64Preshifted numeratorHi numeratorLo' divisor = runST $ do
   -- We now have our separate quotients, now we just have to add them together
   quotientHiFinal <- readSTRef quotientHi
   quotientLoFinal <- readSTRef quotientLo
-  pure $ (quotientHiFinal `shiftL` 32) .|. quotientLoFinal
+  pure $ (quotientHiFinal `unsafeShiftL` 32) .|. quotientLoFinal
 
 divide128MaxBy64 :: Word64 -> Word128
 divide128MaxBy64 divisor =
@@ -74,22 +74,22 @@ divide128MaxBy64 divisor =
     quotientLo = if leadingZeros >= 32
       then
         let 
-          numeratorMid = (remainderHi `shiftL` 32) .|. (fromIntegral (maxBound @Word32))
+          numeratorMid = (remainderHi `unsafeShiftL` 32) .|. (fromIntegral (maxBound @Word32))
           quotientMid = numeratorMid `div` divisor;
           remainderMid = numeratorMid - quotientMid * divisor;
 
-          numeratorLo = (remainderMid `shiftL` 32) .|. (fromIntegral (maxBound @Word32))
+          numeratorLo = (remainderMid `unsafeShiftL` 32) .|. (fromIntegral (maxBound @Word32))
           quotientLo' = numeratorLo `div` divisor
 
-        in (quotientMid `shiftL` 32) .|. quotientLo'
+        in (quotientMid `unsafeShiftL` 32) .|. quotientLo'
       else
         let 
           numeratorHi = if leadingZeros > 0 
-            then (remainderHi `shiftL` leadingZeros) .|. (maxBound @Word64 `shiftR` (64 - leadingZeros)) 
+            then (remainderHi `unsafeShiftL` leadingZeros) .|. (maxBound @Word64 `unsafeShiftR` (64 - leadingZeros)) 
             else remainderHi
-          numeratorLo = maxBound @Word64 `shiftL` leadingZeros;
-        in divide128By64Preshifted numeratorHi numeratorLo (divisor `shiftL` leadingZeros)
-  in ((fromIntegral quotientHi) `shiftL` 64) .|. (fromIntegral quotientLo)
+          numeratorLo = maxBound @Word64 `unsafeShiftL` leadingZeros;
+        in divide128By64Preshifted numeratorHi numeratorLo (divisor `unsafeShiftL` leadingZeros)
+  in ((fromIntegral quotientHi) `unsafeShiftL` 64) .|. (fromIntegral quotientLo)
 
 whileM_ :: (Monad m) => m Bool -> m a -> m ()
 whileM_ p f = go

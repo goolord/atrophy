@@ -67,14 +67,14 @@ multiply256By64Helper prod a b = do
       + Word128 0 p
       + (Word128 0 aDigit * Word128 0 b)
     Contiguous.write prod i . word128Lo64 =<< readSTRef carry
-    modifySTRef carry (`shiftR` 64)
+    modifySTRef carry (`unsafeShiftR` 64)
 
   let productHiSize = productSize - aSize
   for_ [0..productHiSize - 1] $ \i -> do
     p <- Contiguous.read productHi i
     modifySTRef carry (+ Word128 0 p)
     Contiguous.write productHi i . word128Lo64 =<< readSTRef carry
-    modifySTRef carry (`shiftR` 64)
+    modifySTRef carry (`unsafeShiftR` 64)
 
   readSTRef carry >>= \case
     0 -> pure ()
