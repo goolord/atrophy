@@ -5,6 +5,8 @@
   , FlexibleContexts
   , DuplicateRecordFields
   , TypeFamilies
+  , BangPatterns
+  , NumericUnderscores
 #-}
 
 module Atrophy.Internal where
@@ -32,56 +34,51 @@ new con divi =
     let quotient = divide128MaxBy64 $ fromIntegral divi
     in con (quotient + 1) divi
 
-divRem :: (HasField "divisor" r b, HasField "multiplier" r Word128, Num b, Integral b, FiniteBits b)
-  => b -> r -> (b, b)
-divRem numerator denom =
-  case getField @"multiplier" denom of
+{-# INLINE divRem #-}
+divRem :: 
+  ( HasField "divisor" strRed a
+  , HasField "multiplier" strRed Word128
+  , Num a
+  , Integral a
+  , FiniteBits a
+  ) => a -> strRed -> (a, a)
+divRem dividend divis =
+  case getField @"multiplier" divis of
     0 ->
-      (numerator `unsafeShiftR` (countTrailingZeros $ getField @"divisor" denom), numerator .&. (getField @"divisor" denom - 1))
+      let
+        quotient = dividend `unsafeShiftR` (countTrailingZeros $ getField @"divisor" divis)
+        remainder = dividend .&. (getField @"divisor" divis - 1)
+      in (quotient, remainder)
     multiplier' ->
       let
-        numerator128 = fromIntegral @_ @Word128 numerator
-        multipliedHi = numerator128 * (multiplier' `unsafeShiftR` 64)
-        multipliedLo = (numerator128 * (lower128 multiplier')) `unsafeShiftR` 64
+        numerator128 = fromIntegral @_ @Word128 dividend
+        multipliedHi = numerator128 * (upper128 multiplier')
+        multipliedLo = upper128 (numerator128 * (lower128 multiplier'))
 
-        quotient = fromIntegral ((multipliedHi + multipliedLo) `unsafeShiftR` 64)
-        remainder = numerator - quotient * getField @"divisor" denom
+        quotient = fromIntegral (upper128 (multipliedHi + multipliedLo))
+        remainder = dividend - quotient * getField @"divisor" divis
       in (quotient, remainder)
 
 {-# INLINE div' #-}
-div' :: (FiniteBits b, HasField "divisor" r b, HasField "multiplier" r a1,
- Num a1, Bits a2, Eq a1, Integral a2,
- HasField "multiplier" r Word128) => a2 -> r -> a2
-div' a rhs =
-  case getField @"multiplier" rhs of 
-    0 -> a `unsafeShiftR` (countTrailingZeros (getField @"divisor" rhs))
-    multiplier' ->
-      let
-        numerator = fromIntegral a
-        multipliedHi = numerator * (multiplier' `unsafeShiftR` 64)
-        multipliedLo = (numerator * (lower128 multiplier')) `unsafeShiftR` 64
-      in fromIntegral ((multipliedHi + multipliedLo) `unsafeShiftR` 64)
-
-test :: IO ()
-test = do
-  print (div' 81 (new StrengthReducedW64 27) :: Word64)
+div' :: (HasField "divisor" r b, HasField "multiplier" r Word128,
+ Integral b, FiniteBits b) =>
+  b -> r -> b
+div' a rhs = fst $ divRem a rhs
 
 {-# INLINE rem' #-}
-rem' :: (Num a2, HasField "divisor" r a1, HasField "multiplier" r a2,
- Eq a2, HasField "divisor" r b, HasField "multiplier" r Word128,
- Integral a1, FiniteBits b, Bits a1) =>
-  a1 -> r -> a1
-rem' a rhs =
-  case getField @"multiplier" rhs of 
-    0 -> a .&. (getField @"divisor" rhs - 1)
-    _ ->
-      let quotient = a `div'` rhs
-      in a - quotient * getField @"divisor" rhs
+rem' :: (HasField "divisor" r b, HasField "multiplier" r Word128,
+ Integral b, FiniteBits b) =>
+  b -> r -> b
+rem' a rhs = snd $ divRem a rhs
 
 {-# INLINE lower128 #-}
 lower128 :: Word128 -> Word128
-lower128 = fromIntegral @_ @Word128 . word128Lo64
+lower128 (Word128 _hi low) = Word128 0 low
 
-data StrengthReducedW64 = StrengthReducedW64 { multiplier :: !Word128, divisor :: !Word64 }
-data StrengthReducedW32 = StrengthReducedW32 { multiplier :: !Word64 , divisor :: !Word32 }
-data StrengthReducedW16 = StrengthReducedW16 { multiplier :: !Word32 , divisor :: !Word16 }
+{-# INLINE upper128 #-}
+upper128 :: Word128 -> Word128
+upper128 (Word128 hi _low) = Word128 0 hi
+
+data StrengthReducedW64 = StrengthReducedW64 { multiplier :: {-# UNPACK #-} !Word128 , divisor :: {-# UNPACK #-} !Word64 }
+data StrengthReducedW32 = StrengthReducedW32 { multiplier :: {-# UNPACK #-} !Word64  , divisor :: {-# UNPACK #-} !Word32 }
+data StrengthReducedW16 = StrengthReducedW16 { multiplier :: {-# UNPACK #-} !Word32  , divisor :: {-# UNPACK #-} !Word16 }

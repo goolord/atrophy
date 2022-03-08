@@ -12,7 +12,6 @@ import Test.Tasty.QuickCheck
 import Data.WideWord.Word128
 import Data.WideWord.Word256
 import Atrophy
-import Data.Bits
 import Data.Word
 
 main :: IO ()
@@ -57,8 +56,7 @@ unitTests = testGroup "Unit tests"
       ]
   ]
 
-ourDiv :: (Bits a2, Integral a2) =>
-  NonZero a2 -> NonZero Word64 -> a2
+ourDiv :: NonZero Word64 -> NonZero Word64 -> Word64
 ourDiv (NonZero dividend) (NonZero divi) =
   let sr = new StrengthReducedW64 divi
   in div' dividend sr
