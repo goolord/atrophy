@@ -1,10 +1,11 @@
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE
+    TypeApplications
+  , ScopedTypeVariables
+  , LambdaCase
+  , NumericUnderscores
+#-}
 
-{-# LANGUAGE NumericUnderscores #-}
-
-module Atrophy.LongDivision 
+module Atrophy.LongDivision
   ( module X
   , module Atrophy.LongDivision
   )
@@ -36,7 +37,7 @@ longDivision numeratorSlice reducedDivisor quotient = do
         writeSTRef remainder digitRemainder
 
       remainder' -> do
-        -- Do one division that includes the running remainder and the upper half of this numerator element, 
+        -- Do one division that includes the running remainder and the upper half of this numerator element,
         -- then a second division for the first division's remainder combinedwith the lower half
         let upperNumerator = (remainder' `unsafeShiftL` 32) .|. (numeratorElement `unsafeShiftR` 32)
         let (upperQuotient, upperRemainder) = divRem upperNumerator reducedDivisor

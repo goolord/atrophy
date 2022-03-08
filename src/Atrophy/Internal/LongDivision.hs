@@ -1,22 +1,17 @@
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE LambdaCase #-}
-
-{-# OPTIONS_GHC -Wno-unused-imports #-}
-{-# OPTIONS_GHC -Wno-unused-matches #-}
-{-# OPTIONS_GHC -Wno-unused-local-binds #-}
-{-# LANGUAGE NumericUnderscores #-}
+{-# LANGUAGE
+    TypeApplications
+  , ScopedTypeVariables
+  , LambdaCase
+  , NumericUnderscores
+#-}
 
 module Atrophy.Internal.LongDivision where
 
 import Data.WideWord.Word128
 import Data.Word
-import qualified Data.Primitive.Contiguous as Contiguous
-import Data.Primitive.Contiguous (SmallArray, Slice, Mutable, MutableSliced, Sliced)
-import Control.Monad.ST.Strict (ST, runST)
-import Data.STRef.Strict (newSTRef, modifySTRef, readSTRef, writeSTRef)
+import Control.Monad.ST.Strict (runST)
+import Data.STRef.Strict (newSTRef, modifySTRef, readSTRef)
 import Data.Bits
-import Data.Foldable (for_)
 import Data.Functor ((<&>))
 
 -- divides a 128-bit number by a 64-bit divisor, returning the quotient as a 64-bit number
@@ -50,7 +45,7 @@ divide128By64Preshifted numeratorHi numeratorLo' divisor = runST $ do
   let fullLowerNumerator = (remainderHi `unsafeShiftL` 32) .|. numeratorLo
 
   quotientLo <- newSTRef $ min ((fromIntegral @_ @Word64 remainderHi) `div` divisorHi) (fromIntegral $ maxBound @Word32)
-  productLo  <- do 
+  productLo  <- do
     x <- readSTRef quotientLo
     newSTRef $ (Word128 0 x) * divisorFull128
 
@@ -73,7 +68,7 @@ divide128MaxBy64 divisor =
     leadingZeros = countLeadingZeros divisor
     quotientLo = if leadingZeros >= 32
       then
-        let 
+        let
           numeratorMid = (remainderHi `unsafeShiftL` 32) .|. (fromIntegral (maxBound @Word32))
           quotientMid = numeratorMid `div` divisor;
           remainderMid = numeratorMid - quotientMid * divisor;
@@ -83,9 +78,9 @@ divide128MaxBy64 divisor =
 
         in (quotientMid `unsafeShiftL` 32) .|. quotientLo'
       else
-        let 
-          numeratorHi = if leadingZeros > 0 
-            then (remainderHi `unsafeShiftL` leadingZeros) .|. (maxBound @Word64 `unsafeShiftR` (64 - leadingZeros)) 
+        let
+          numeratorHi = if leadingZeros > 0
+            then (remainderHi `unsafeShiftL` leadingZeros) .|. (maxBound @Word64 `unsafeShiftR` (64 - leadingZeros))
             else remainderHi
           numeratorLo = maxBound @Word64 `unsafeShiftL` leadingZeros;
         in divide128By64Preshifted numeratorHi numeratorLo (divisor `unsafeShiftL` leadingZeros)
@@ -93,7 +88,7 @@ divide128MaxBy64 divisor =
 
 whileM_ :: (Monad m) => m Bool -> m a -> m ()
 whileM_ p f = go
-  where 
+  where
   go = do
     x <- p
     if x

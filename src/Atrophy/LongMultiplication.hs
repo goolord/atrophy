@@ -1,6 +1,8 @@
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE
+    TypeApplications
+  , ScopedTypeVariables
+  , LambdaCase
+#-}
 
 module Atrophy.LongMultiplication where
 
@@ -16,7 +18,7 @@ import Data.Foldable (for_)
 {-# INLINE multiply256By128UpperBits #-}
 multiply256By128UpperBits :: Word128 -> Word128 -> Word128 -> Word128
 multiply256By128UpperBits aHi aLo b =
-  let 
+  let
     -- Break a and b into little-endian 64-bit chunks
     aChunks :: SmallArray Word64
     aChunks = Contiguous.quadrupleton
@@ -35,13 +37,13 @@ multiply256By128UpperBits aHi aLo b =
       prod' <- Contiguous.replicateMut 6 0
       flip Contiguous.itraverse_ bChunks $ \bIndex bDigit -> do
         pSize <- Contiguous.sizeMut prod'
-        multiply256By64Helper 
+        multiply256By64Helper
             (Contiguous.sliceMut prod' bIndex (pSize - bIndex))
             aChunks
             bDigit
       pure prod'
 
-  in Word128 
+  in Word128
     { word128Hi64 = Contiguous.index prod 5
     , word128Lo64 = Contiguous.index prod 4
     }
@@ -52,7 +54,7 @@ multiply256By64Helper _ _ 0 = pure ()
 multiply256By64Helper prod a b = do
   carry <- newSTRef 0
   productSize <- Contiguous.sizeMut prod
-  let 
+  let
     aSize = Contiguous.size a
     productLo :: MutableSliced SmallArray s Word64
     productLo = Contiguous.sliceMut prod 0 aSize
@@ -83,6 +85,6 @@ multiply256By64Helper prod a b = do
 -- compute prod += a * b
 {-# INLINE longMultiply #-}
 longMultiply :: forall s. SmallArray Word64 -> Word64 -> Mutable SmallArray s Word64 -> ST s ()
-longMultiply a b prod = do 
+longMultiply a b prod = do
   prod' <- Contiguous.toSliceMut prod
   multiply256By64Helper prod' a b
