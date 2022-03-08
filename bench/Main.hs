@@ -48,7 +48,9 @@ main :: IO ()
 main = do
   defaultMain $
     [ bgroup "atrophy"
-        [ randomEnv (manyRandom @(Word64, Word64)) $ \somePairs ->
+        [ randomEnv (uniformM globalStdGen) $ \divisor' ->
+            bench "new" $ nf (new StrengthReducedW64) divisor'
+        , randomEnv (manyRandom @(Word64, Word64)) $ \somePairs ->
             bench "div 10000 uniques" $ nf (fmap (\(x, y) -> x `div'` new StrengthReducedW64 y)) somePairs
         , randomEnv' ((,) <$> (new StrengthReducedW64 <$> randomRIO (1, maxBound)) <*> manyRandom @Word64) $ \x -> bench "div 10000, 1 divisor" $ nfIO $ do 
             (divisor', dividends) <- x
