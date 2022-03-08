@@ -20,7 +20,7 @@ main = do
   defaultMain tests
 
 tests :: TestTree
-tests = 
+tests =
   testGroup "Tests" [unitTests]
 
 instance Arbitrary Word128 where
@@ -29,8 +29,8 @@ instance Arbitrary Word128 where
 -- wrong
 naiveMultiply256By128UpperBits :: Word128 -> Word128 -> Word128 -> Word128
 naiveMultiply256By128UpperBits aHi aLo b =
-  let 
-    a' = Word256 
+  let
+    a' = Word256
       { word256hi = word128Hi64 aHi
       , word256m1 = word128Lo64 aHi
       , word256m0 = word128Hi64 aLo
@@ -47,12 +47,12 @@ naiveMultiply256By128UpperBits aHi aLo b =
 
 unitTests :: TestTree
 unitTests = testGroup "Unit tests"
-  [ testGroup "Long multiplication" 
+  [ testGroup "Long multiplication"
       [ -- testProperty "multiply256By128UpperBits" $ equivalentOnArbitrary3 multiply256By128UpperBits naiveMultiply256By128UpperBits
       ]
   , testGroup "Long division"
       [ testGroup "StrengthReducedW64" [
-          testProperty "div" $ equivalentOnArbitrary2 ourDiv theirDiv
+          testProperty "div" $ \(a, b) -> ourDiv a b === theirDiv a b
         ]
       ]
   ]
@@ -66,51 +66,3 @@ ourDiv (NonZero dividend) (NonZero divi) =
 theirDiv :: Integral a => NonZero a -> NonZero a -> a
 theirDiv (NonZero dividend) (NonZero divi) =
   dividend `div` divi
-
-equivalentOnGens2 ::
-     (Show a, Show b, Show d, Eq d)
-  => (a -> b -> d)
-  -> (a -> b -> d)
-  -> Gen (a, b)
-  -> ((a, b) -> [(a, b)])
-  -> Property
-equivalentOnGens2 f g gen s =
-    forAllShrink gen s $ \(a, b) -> f a b === g a b
-
-equivalentOnArbitrary2 ::
-     ( Show a
-     , Arbitrary a
-     , Show b
-     , Arbitrary b
-     , Show d
-     , Eq d
-     )
-  => (a -> b -> d)
-  -> (a -> b -> d)
-  -> Property
-equivalentOnArbitrary2 f g = equivalentOnGens2 f g arbitrary shrink
-
-equivalentOnGens3 ::
-     (Show a, Show b, Show c, Show d, Eq d)
-  => (a -> b -> c -> d)
-  -> (a -> b -> c -> d)
-  -> Gen (a, b, c)
-  -> ((a, b, c) -> [(a, b, c)])
-  -> Property
-equivalentOnGens3 f g gen s =
-    forAllShrink gen s $ \(a, b, c) -> f a b c === g a b c
-
-equivalentOnArbitrary3 ::
-     ( Show a
-     , Arbitrary a
-     , Show b
-     , Arbitrary b
-     , Show c
-     , Arbitrary c
-     , Show d
-     , Eq d
-     )
-  => (a -> b -> c -> d)
-  -> (a -> b -> c -> d)
-  -> Property
-equivalentOnArbitrary3 f g = equivalentOnGens3 f g arbitrary shrink
