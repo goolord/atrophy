@@ -21,15 +21,18 @@ import Test.Tasty.Bench (bench, bgroup, defaultMain, nf, Benchmark, envWithClean
 import Control.DeepSeq (NFData, force)
 import Atrophy
 import GHC.Generics
-import Data.Word (Word64)
+import Data.Word (Word64, Word32)
 import Control.Exception (evaluate)
 import Test.Tasty (withResource)
 import System.Mem (performMajorGC)
 import System.Random.Stateful
+import Data.Proxy (Proxy (Proxy))
 
 deriving instance Generic StrengthReducedW64
-
 instance NFData StrengthReducedW64
+
+deriving instance Generic StrengthReducedW32
+instance NFData StrengthReducedW32
 
 manyRandom :: forall a. (Uniform a, NFData a) => IO [a]
 manyRandom = uniformListM 10_000 globalStdGen
@@ -48,19 +51,36 @@ main :: IO ()
 main = do
   defaultMain $
     [ bgroup "atrophy"
-        [ randomEnv (uniformM globalStdGen) $ \divisor' ->
-            bench "new" $ nf (new StrengthReducedW64) divisor'
-        , randomEnv (manyRandom @(Word64, Word64)) $ \somePairs ->
-            bench "div 10000 uniques" $ nf (fmap (\(x, y) -> x `div'` new StrengthReducedW64 y)) somePairs
-        , randomEnv' ((,) <$> (new StrengthReducedW64 <$> randomRIO (1, maxBound)) <*> manyRandom @Word64) $ \x -> bench "div 10000, 1 divisor" $ nfIO $ do 
-            (divisor', dividends) <- x
-            pure $ fmap (\dividend' -> dividend' `div'` divisor') dividends
+        [ bgroup "Word64"
+          [ randomEnv (uniformM globalStdGen) $ \divisor' ->
+              bench "new" $ nf new divisor'
+          , randomEnv (manyRandom @(Word64, Word64)) $ \somePairs ->
+              bench "div 10000 uniques" $ nf (fmap (\(x, y) -> x `div'` new y)) somePairs
+          , randomEnv' ((,) <$> (new <$> randomRIO (1, maxBound)) <*> manyRandom @Word64) $ \x -> bench "div 10000, 1 divisor" $ nfIO $ do 
+              (divisor', dividends) <- x
+              pure $ fmap (\dividend' -> dividend' `div'` divisor') dividends
+          ]
+        , bgroup "Word32"
+          [ randomEnv (uniformM globalStdGen) $ \divisor' ->
+              bench "new" $ nf (new32 StrengthReducedW32) divisor'
+          , randomEnv (manyRandom @(Word32, Word32)) $ \somePairs ->
+              bench "div 10000 uniques" $ nf (fmap (\(x, y) -> x `div32'` new32 StrengthReducedW32 y)) somePairs
+          , randomEnv' ((,) <$> (new32 StrengthReducedW32 <$> randomRIO (1, maxBound)) <*> manyRandom @Word32) $ \x -> bench "div 10000, 1 divisor" $ nfIO $ do 
+              (divisor', dividends) <- x
+              pure $ fmap (\dividend' -> dividend' `div32'` divisor') dividends
+          ]
         ]
     , bgroup "ghc"
-        [ randomEnv (manyRandom @(Word64, Word64)) $ \somePairs ->
-            bench "div 10000 uniques" $ nf (\xs -> fmap (\(x, y) -> x `div` y) xs) somePairs
-        , randomEnv' ((,) <$> randomRIO (1, maxBound) <*> manyRandom @Word64) $ \x -> bench "div 10000, 1 divisor" $ nfIO $ do 
-            (divisor', dividends) <- x
-            pure $ fmap (\dividend' -> dividend' `div` divisor') dividends
+        [ bgroup "Word64" $ ghcBench (Proxy @Word64)
+        , bgroup "Word32" $ ghcBench (Proxy @Word32)
         ]
     ]
+
+ghcBench :: forall a. (NFData a, Uniform a, Integral a, Random a, Bounded a) => Proxy a -> [Benchmark]
+ghcBench _ =
+  [ randomEnv (manyRandom @(a, a)) $ \somePairs ->
+      bench "div 10000 uniques" $ nf (\xs -> fmap (\(x, y) -> x `div` y) xs) somePairs
+  , randomEnv' ((,) <$> randomRIO (1, maxBound) <*> manyRandom @a) $ \x -> bench "div 10000, 1 divisor" $ nfIO $ do 
+      (divisor', dividends) <- x
+      pure $ fmap (\dividend' -> dividend' `div` divisor') dividends
+  ]

@@ -22,20 +22,20 @@ import Data.Word
 isPowerOf2 :: (Bits a, Num a) => a -> Bool
 isPowerOf2 x = (x .&. (x - 1)) == 0
 
-type Con t a = (Word128 -> t -> a)
+type Con t a = ((Multiplier t) -> t -> a)
 
 {-# INLINE new #-}
-new :: (Bits t, Integral t) => Con t a -> t -> a
-new con divi =
+new :: Word64 -> StrengthReducedW64
+new divi =
   assert (divi > 0) $
   if isPowerOf2 divi
-  then con 0 divi
+  then StrengthReducedW64 0 divi
   else
     let quotient = divide128MaxBy64 $ fromIntegral divi
-    in con (quotient + 1) divi
+    in StrengthReducedW64 (quotient + 1) divi
 
 {-# INLINE divRem #-}
-divRem :: 
+divRem ::
   ( HasField "divisor" strRed a
   , HasField "multiplier" strRed Word128
   , Num a
@@ -59,6 +59,40 @@ divRem dividend divis =
         remainder = dividend - quotient * getField @"divisor" divis
       in (quotient, remainder)
 
+{-# INLINE divRem32 #-}
+divRem32 ::
+  ( HasField "divisor" strRed a
+  , HasField "multiplier" strRed Word64
+  , Num a
+  , Integral a
+  , FiniteBits a
+  ) => a -> strRed -> (a, a)
+divRem32 dividend divis =
+  case getField @"multiplier" divis of
+    0 ->
+      let
+        quotient = dividend `unsafeShiftR` (countTrailingZeros $ getField @"divisor" divis)
+        remainder = dividend .&. (getField @"divisor" divis - 1)
+      in (quotient, remainder)
+    multiplier' ->
+      let
+        numerator128 = fromIntegral @_ @Word64 dividend
+        multipliedHi = numerator128 * (multiplier' `unsafeShiftR` 32)
+        multipliedLo = (numerator128 * (multiplier' `unsafeShiftL` 32)) `unsafeShiftR` 32
+
+        quotient = fromIntegral ((multipliedHi + multipliedLo) `unsafeShiftR` 32)
+        remainder = dividend - quotient * getField @"divisor" divis
+      in (quotient, remainder)
+
+new32 :: (Ord t, Num t, Bits t, Integral t, Bounded t, Num (Multiplier t), Bounded (Multiplier t), Integral (Multiplier t)) => Con t a -> t -> a
+new32 con divi =
+  assert (divi > 0) $
+  if isPowerOf2 divi
+  then con 0 divi
+  else
+    let quotient = maxBound `div` fromIntegral divi
+    in con (quotient + 1) divi
+
 {-# INLINE div' #-}
 div' :: (HasField "divisor" r b, HasField "multiplier" r Word128,
  Integral b, FiniteBits b) =>
@@ -70,6 +104,18 @@ rem' :: (HasField "divisor" r b, HasField "multiplier" r Word128,
  Integral b, FiniteBits b) =>
   b -> r -> b
 rem' a rhs = snd $ divRem a rhs
+
+{-# INLINE div32' #-}
+div32' :: (HasField "divisor" strRed b, HasField "multiplier" strRed Word64,
+  Integral b, FiniteBits b) =>
+  b -> strRed -> b
+div32' a rhs = fst $ divRem32 a rhs
+
+{-# INLINE rem32' #-}
+rem32' :: (HasField "divisor" strRed b, HasField "multiplier" strRed Word64,
+  Integral b, FiniteBits b) =>
+  b -> strRed -> b
+rem32' a rhs = snd $ divRem32 a rhs
 
 {-# INLINE lower128 #-}
 lower128 :: Word128 -> Word128
