@@ -8,6 +8,7 @@
   , GeneralizedNewtypeDeriving
   , TypeApplications
   , ScopedTypeVariables
+  , NumericUnderscores
 #-}
 
 {-# OPTIONS_GHC
@@ -19,20 +20,19 @@ module Main where
 import Test.Tasty.Bench (bench, bgroup, defaultMain, nf, Benchmark, envWithCleanup, nfIO)
 import Control.DeepSeq (NFData, force)
 import Atrophy
-import System.Random (randomIO, Random, randomRIO)
 import GHC.Generics
 import Data.Word (Word64)
-import Control.Monad (replicateM)
 import Control.Exception (evaluate)
 import Test.Tasty (withResource)
 import System.Mem (performMajorGC)
+import System.Random.Stateful
 
 deriving instance Generic StrengthReducedW64
 
 instance NFData StrengthReducedW64
 
-manyRandom :: forall a. (Random a, NFData a) => IO [a]
-manyRandom = replicateM 10000 randomIO
+manyRandom :: forall a. (Uniform a, NFData a) => IO [a]
+manyRandom = uniformListM 10_000 globalStdGen
 
 randomEnv :: NFData b => IO b
   -> (b -> Benchmark)
