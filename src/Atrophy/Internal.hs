@@ -4,6 +4,7 @@
   , DataKinds
   , FlexibleContexts
   , DuplicateRecordFields
+  , TypeFamilies
 #-}
 
 module Atrophy.Internal where
@@ -81,6 +82,6 @@ rem' a rhs =
 lower128 :: Word128 -> Word128
 lower128 = fromIntegral @_ @Word128 . word128Lo64
 
-data StrengthReducedW64 = StrengthReducedW64 { multiplier :: Word128, divisor :: Word64 }
-data StrengthReducedW32 = StrengthReducedW32 { multiplier :: Word64, divisor :: Word32 }
-data StrengthReducedW16 = StrengthReducedW16 { multiplier :: Word32, divisor :: Word16 }
+data StrengthReducedW64 = StrengthReducedW64 { multiplier :: !Word128, divisor :: !Word64 }
+data StrengthReducedW32 = StrengthReducedW32 { multiplier :: !Word64 , divisor :: !Word32 }
+data StrengthReducedW16 = StrengthReducedW16 { multiplier :: !Word32 , divisor :: !Word16 }

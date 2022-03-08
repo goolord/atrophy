@@ -16,12 +16,12 @@ import Data.WideWord.Word128
 import Data.Word
 
 data StrengthReducedW8 = StrengthReducedW8
-  { multiplier :: Word16
-  , divisor :: Word8
+  { multiplier :: !Word16
+  , divisor    :: !Word8
   }
 
 data StrengthReducedW128 = StrengthReducedW128
-  { multiplierHi :: Word128
-  , multiplierLo :: Word128
-  , divisor :: Word128
+  { multiplierHi :: !Word128
+  , multiplierLo :: !Word128
+  , divisor      :: !Word128
   }
