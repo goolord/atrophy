@@ -148,3 +148,10 @@ type family Half a where
 data StrengthReducedW64 = StrengthReducedW64 { multiplier :: {-# UNPACK #-} !(Multiplier Word64), divisor :: {-# UNPACK #-} !Word64 }
 data StrengthReducedW32 = StrengthReducedW32 { multiplier :: {-# UNPACK #-} !(Multiplier Word32), divisor :: {-# UNPACK #-} !Word32 }
 data StrengthReducedW16 = StrengthReducedW16 { multiplier :: {-# UNPACK #-} !(Multiplier Word16), divisor :: {-# UNPACK #-} !Word16 }
+data StrengthReducedW8  = StrengthReducedW7  { multiplier :: {-# UNPACK #-} !(Multiplier Word8) , divisor :: {-# UNPACK #-} !Word8  }
+
+data StrengthReducedW128 = StrengthReducedW128
+  { multiplierHi :: {-#UNPACK #-} !Word128
+  , multiplierLo :: {-#UNPACK #-} !Word128
+  , divisor      :: {-#UNPACK #-} !Word128
+  }
