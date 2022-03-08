@@ -79,6 +79,12 @@ lower128 (Word128 _hi low) = Word128 0 low
 upper128 :: Word128 -> Word128
 upper128 (Word128 hi _low) = Word128 0 hi
 
-data StrengthReducedW64 = StrengthReducedW64 { multiplier :: {-# UNPACK #-} !Word128 , divisor :: {-# UNPACK #-} !Word64 }
-data StrengthReducedW32 = StrengthReducedW32 { multiplier :: {-# UNPACK #-} !Word64  , divisor :: {-# UNPACK #-} !Word32 }
-data StrengthReducedW16 = StrengthReducedW16 { multiplier :: {-# UNPACK #-} !Word32  , divisor :: {-# UNPACK #-} !Word16 }
+type family Multiplier a where
+  Multiplier Word64 = Word128
+  Multiplier Word32 = Word64
+  Multiplier Word16 = Word32
+  Multiplier Word8  = Word16
+
+data StrengthReducedW64 = StrengthReducedW64 { multiplier :: {-# UNPACK #-} !(Multiplier Word64), divisor :: {-# UNPACK #-} !Word64 }
+data StrengthReducedW32 = StrengthReducedW32 { multiplier :: {-# UNPACK #-} !(Multiplier Word32), divisor :: {-# UNPACK #-} !Word32 }
+data StrengthReducedW16 = StrengthReducedW16 { multiplier :: {-# UNPACK #-} !(Multiplier Word16), divisor :: {-# UNPACK #-} !Word16 }
