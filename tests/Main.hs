@@ -50,15 +50,21 @@ unitTests = testGroup "Unit tests"
       [ -- testProperty "multiply256By128UpperBits" $ equivalentOnArbitrary3 multiply256By128UpperBits naiveMultiply256By128UpperBits
       ]
   , testGroup "Long division"
-      [ testGroup "StrengthReducedW64" [
-          testProperty "div" $ \(a, b) -> ourDiv a b === theirDiv a b
+      [ testGroup "StrengthReducedW64" 
+        [ testProperty "div64" $ \(a, b) -> ourDiv64 a b === theirDiv a b
+        , testProperty "div32" $ \(a, b) -> ourDiv32 a b === theirDiv a b
         ]
       ]
   ]
 
-ourDiv :: NonZero Word64 -> NonZero Word64 -> Word64
-ourDiv (NonZero dividend) (NonZero divi) =
-  let sr = new StrengthReducedW64 divi
+ourDiv64 :: NonZero Word64 -> NonZero Word64 -> Word64
+ourDiv64 (NonZero dividend) (NonZero divi) =
+  let sr = new64 divi
+  in div64 dividend sr
+
+ourDiv32 :: NonZero Word32 -> NonZero Word32 -> Word32
+ourDiv32 (NonZero dividend) (NonZero divi) =
+  let sr = new StrengthReducedW32 divi
   in div' dividend sr
 
 theirDiv :: Integral a => NonZero a -> NonZero a -> a

@@ -53,21 +53,21 @@ main = do
     [ bgroup "atrophy"
         [ bgroup "Word64"
           [ randomEnv (uniformM globalStdGen) $ \divisor' ->
-              bench "new" $ nf new divisor'
+              bench "new64" $ nf new64 divisor'
           , randomEnv (manyRandom @(Word64, Word64)) $ \somePairs ->
-              bench "div 10000 uniques" $ nf (fmap (\(x, y) -> x `div'` new y)) somePairs
-          , randomEnv' ((,) <$> (new <$> randomRIO (1, maxBound)) <*> manyRandom @Word64) $ \x -> bench "div 10000, 1 divisor" $ nfIO $ do 
+              bench "div 10000 uniques" $ nf (fmap (\(x, y) -> x `div64` new64 y)) somePairs
+          , randomEnv' ((,) <$> (new64 <$> randomRIO (1, maxBound)) <*> manyRandom @Word64) $ \x -> bench "div 10000, 1 divisor" $ nfIO $ do 
               (divisor', dividends) <- x
-              pure $ fmap (\dividend' -> dividend' `div'` divisor') dividends
+              pure $ fmap (\dividend' -> dividend' `div64` divisor') dividends
           ]
         , bgroup "Word32"
           [ randomEnv (uniformM globalStdGen) $ \divisor' ->
-              bench "new" $ nf (new32 StrengthReducedW32) divisor'
+              bench "new" $ nf (new StrengthReducedW32) divisor'
           , randomEnv (manyRandom @(Word32, Word32)) $ \somePairs ->
-              bench "div 10000 uniques" $ nf (fmap (\(x, y) -> x `div32'` new32 StrengthReducedW32 y)) somePairs
-          , randomEnv' ((,) <$> (new32 StrengthReducedW32 <$> randomRIO (1, maxBound)) <*> manyRandom @Word32) $ \x -> bench "div 10000, 1 divisor" $ nfIO $ do 
+              bench "div 10000 uniques" $ nf (fmap (\(x, y) -> x `div'` new StrengthReducedW32 y)) somePairs
+          , randomEnv' ((,) <$> (new StrengthReducedW32 <$> randomRIO (1, maxBound)) <*> manyRandom @Word32) $ \x -> bench "div 10000, 1 divisor" $ nfIO $ do 
               (divisor', dividends) <- x
-              pure $ fmap (\dividend' -> dividend' `div32'` divisor') dividends
+              pure $ fmap (\dividend' -> dividend' `div'` divisor') dividends
           ]
         ]
     , bgroup "ghc"
