@@ -51,24 +51,8 @@ main :: IO ()
 main = do
   defaultMain $
     [ bgroup "atrophy"
-        [ bgroup "Word64"
-          [ randomEnv (uniformM globalStdGen) $ \divisor' ->
-              bench "new64" $ nf new64 divisor'
-          , randomEnv (manyRandom @(Word64, Word64)) $ \somePairs ->
-              bench "div 10000 uniques" $ nf (fmap (\(x, y) -> x `div64` new64 y)) somePairs
-          , randomEnv' ((,) <$> (new64 <$> randomRIO (1, maxBound)) <*> manyRandom @Word64) $ \x -> bench "div 10000, 1 divisor" $ nfIO $ do 
-              (divisor', dividends) <- x
-              pure $ fmap (\dividend' -> dividend' `div64` divisor') dividends
-          ]
-        , bgroup "Word32"
-          [ randomEnv (uniformM globalStdGen) $ \divisor' ->
-              bench "new" $ nf (new StrengthReducedW32) divisor'
-          , randomEnv (manyRandom @(Word32, Word32)) $ \somePairs ->
-              bench "div 10000 uniques" $ nf (fmap (\(x, y) -> x `div'` new StrengthReducedW32 y)) somePairs
-          , randomEnv' ((,) <$> (new StrengthReducedW32 <$> randomRIO (1, maxBound)) <*> manyRandom @Word32) $ \x -> bench "div 10000, 1 divisor" $ nfIO $ do 
-              (divisor', dividends) <- x
-              pure $ fmap (\dividend' -> dividend' `div'` divisor') dividends
-          ]
+        [ bgroup "Word64" $ atrophyBench div64 new64
+        , bgroup "Word32" $ atrophyBench div' (new StrengthReducedW32)
         ]
     , bgroup "ghc"
         [ bgroup "Word64" $ ghcBench (Proxy @Word64)
@@ -83,4 +67,15 @@ ghcBench _ =
   , randomEnv' ((,) <$> randomRIO (1, maxBound) <*> manyRandom @a) $ \x -> bench "div 10000, 1 divisor" $ nfIO $ do 
       (divisor', dividends) <- x
       pure $ fmap (\dividend' -> dividend' `div` divisor') dividends
+  ]
+
+atrophyBench :: forall base sr out. (NFData base, Uniform base, NFData sr, NFData out, Random base, Num base, Bounded base) => (base -> sr -> out) -> (base -> sr) -> [Benchmark]
+atrophyBench divF newF =
+  [ randomEnv (uniformM globalStdGen) $ \divisor' ->
+      bench "new" $ nf newF divisor'
+  , randomEnv (manyRandom @(base, base)) $ \somePairs ->
+      bench "div 10000 uniques" $ nf (fmap (\(x, y) -> x `divF` newF y)) somePairs
+  , randomEnv' ((,) <$> (newF <$> randomRIO (1, maxBound)) <*> manyRandom @base) $ \x -> bench "div 10000, 1 divisor" $ nfIO $ do 
+      (divisor', dividends) <- x
+      pure $ fmap (\dividend' -> dividend' `divF` divisor') dividends
   ]
