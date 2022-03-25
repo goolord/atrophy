@@ -15,13 +15,13 @@ import Data.Word
 import Atrophy.Internal.LongDivision as X
 import Atrophy.Internal
 import qualified Data.Primitive.Contiguous as Contiguous
-import Data.Primitive.Contiguous (SmallArray, Mutable, Sliced)
+import Data.Primitive.Contiguous (PrimArray, Mutable, Sliced)
 import Control.Monad.ST.Strict (ST)
 import Data.STRef.Strict (newSTRef, readSTRef, writeSTRef)
 import Data.Bits
 
 {-# NOINLINE longDivision #-}
-longDivision :: forall s. Sliced SmallArray Word64 -> StrengthReducedW64 -> Mutable SmallArray s Word64 -> ST s ()
+longDivision :: forall s. Sliced PrimArray Word64 -> StrengthReducedW64 -> Mutable PrimArray s Word64 -> ST s ()
 longDivision numeratorSlice reducedDivisor quotient = do
   remainder <- newSTRef 0
   (flip Contiguous.itraverse_) numeratorSlice $ \i numerator -> do

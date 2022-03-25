@@ -9,7 +9,7 @@ module Atrophy.LongMultiplication where
 import Data.WideWord.Word128
 import Data.Word
 import qualified Data.Primitive.Contiguous as Contiguous
-import Data.Primitive.Contiguous (SmallArray, MutableSliced, Mutable)
+import Data.Primitive.Contiguous (PrimArray, MutableSliced, Mutable)
 import Control.Monad.ST.Strict (ST)
 import Data.STRef.Strict (newSTRef, modifySTRef, readSTRef)
 import Data.Bits
@@ -20,19 +20,19 @@ multiply256By128UpperBits :: Word128 -> Word128 -> Word128 -> Word128
 multiply256By128UpperBits aHi aLo b =
   let
     -- Break a and b into little-endian 64-bit chunks
-    aChunks :: SmallArray Word64
+    aChunks :: PrimArray Word64
     aChunks = Contiguous.quadrupleton
       (word128Lo64 aLo)
       (word128Hi64 aLo)
       (word128Lo64 aHi)
       (word128Hi64 aHi)
-    bChunks :: SmallArray Word64
+    bChunks :: PrimArray Word64
     bChunks = Contiguous.doubleton
       (word128Lo64 b)
       (word128Hi64 b)
 
     -- Multiply b by a, one chunk of b at a time
-    prod :: SmallArray Word64
+    prod :: PrimArray Word64
     prod = Contiguous.create $ do
       prod' <- Contiguous.replicateMut 6 0
       flip Contiguous.itraverse_ bChunks $ \bIndex bDigit -> do
@@ -49,16 +49,16 @@ multiply256By128UpperBits aHi aLo b =
     }
 
 {-# INLINE multiply256By64Helper #-}
-multiply256By64Helper :: forall s. MutableSliced SmallArray s Word64 -> SmallArray Word64 -> Word64 -> ST s ()
+multiply256By64Helper :: forall s. MutableSliced PrimArray s Word64 -> PrimArray Word64 -> Word64 -> ST s ()
 multiply256By64Helper _ _ 0 = pure ()
 multiply256By64Helper prod a b = do
   carry <- newSTRef 0
   productSize <- Contiguous.sizeMut prod
   let
     aSize = Contiguous.size a
-    productLo :: MutableSliced SmallArray s Word64
+    productLo :: MutableSliced PrimArray s Word64
     productLo = Contiguous.sliceMut prod 0 aSize
-    productHi :: MutableSliced SmallArray s Word64
+    productHi :: MutableSliced PrimArray s Word64
     productHi = Contiguous.sliceMut prod aSize (productSize - aSize)
   -- Multiply each of the digits in a by b, adding them into the 'prod' value.
   -- We don't zero out prod, because we this will be called multiple times, so it probably contains a previous iteration's partial prod, and we're adding + carrying on top of it
@@ -84,7 +84,7 @@ multiply256By64Helper prod a b = do
 
 -- compute prod += a * b
 {-# INLINE longMultiply #-}
-longMultiply :: forall s. SmallArray Word64 -> Word64 -> Mutable SmallArray s Word64 -> ST s ()
+longMultiply :: forall s. PrimArray Word64 -> Word64 -> Mutable PrimArray s Word64 -> ST s ()
 longMultiply a b prod = do
   prod' <- Contiguous.toSliceMut prod
   multiply256By64Helper prod' a b
