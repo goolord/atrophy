@@ -23,8 +23,6 @@ import Data.Word
 isPowerOf2 :: (Bits a, Num a) => a -> Bool
 isPowerOf2 x = (x .&. (x - 1)) == 0
 
-type Con t a = ((Multiplier t) -> t -> a)
-
 {-# INLINE new64 #-}
 new64 :: Word64 -> StrengthReducedW64
 new64 divi =
@@ -35,15 +33,15 @@ new64 divi =
     let quotient = divide128MaxBy64 $ fromIntegral divi
     in StrengthReducedW64 (quotient + 1) divi
 
-{-# INLINE divRem #-}
-divRem ::
+{-# INLINE divRem64 #-}
+divRem64 ::
   ( HasField "divisor" strRed a
   , HasField "multiplier" strRed Word128
   , Num a
   , Integral a
   , FiniteBits a
   ) => a -> strRed -> (a, a)
-divRem dividend divis =
+divRem64 dividend divis =
   case getField @"multiplier" divis of
     0 ->
       let
@@ -60,14 +58,14 @@ divRem dividend divis =
         remainder = dividend - quotient * getField @"divisor" divis
       in (quotient, remainder)
 
-{-# INLINE divRem32 #-}
-divRem32 :: forall strRed a b.
+{-# INLINE divRem #-}
+divRem :: forall strRed a b.
   ( HasField "divisor" strRed a
   , HasField "multiplier" strRed b
   , Num a
   , Integral a
   , FiniteBits a, Num b, Eq b, Integral b, FiniteBits (Half b), Bits b) => a -> strRed -> (a, a)
-divRem32 dividend divis =
+divRem dividend divis =
   case getField @"multiplier" divis of
     0 ->
       let
@@ -84,7 +82,7 @@ divRem32 dividend divis =
         remainder = dividend - quotient * getField @"divisor" divis
       in (quotient, remainder)
 
-new :: (Ord t, Num t, Bits t, Integral t, Bounded t, Num (Multiplier t), Bounded (Multiplier t), Integral (Multiplier t)) => Con t a -> t -> a
+new :: (Ord t, Num t, Bits t, Integral t, Bounded t, Num (Multiplier t), Bounded (Multiplier t), Integral (Multiplier t)) => ((Multiplier t) -> t -> a) -> t -> a
 new con divi =
   assert (divi > 0) $
   if isPowerOf2 divi
@@ -97,25 +95,29 @@ new con divi =
 div64 :: (HasField "divisor" r b, HasField "multiplier" r Word128,
  Integral b, FiniteBits b) =>
   b -> r -> b
-div64 a rhs = fst $ divRem a rhs
+div64 a rhs = fst $ divRem64 a rhs
 
-{-# INLINE rem' #-}
-rem' :: (HasField "divisor" r b, HasField "multiplier" r Word128,
+{-# INLINE rem64 #-}
+rem64 :: (HasField "divisor" r b, HasField "multiplier" r Word128,
  Integral b, FiniteBits b) =>
   b -> r -> b
-rem' a rhs = snd $ divRem a rhs
+rem64 a rhs = snd $ divRem64 a rhs
 
 {-# INLINE div' #-}
-div' :: (HasField "divisor" strRed b, HasField "multiplier" strRed Word64,
-  Integral b, FiniteBits b) =>
-  b -> strRed -> b
-div' a rhs = fst $ divRem32 a rhs
+div' ::
+  ( HasField "divisor" strRed b
+  , HasField "multiplier" strRed w
+  , Integral b, FiniteBits b,  Integral w, FiniteBits (Half w), Bits w
+  ) => b -> strRed -> b
+div' a rhs = fst $ divRem a rhs
 
-{-# INLINE rem32' #-}
-rem32' :: (HasField "divisor" strRed b, HasField "multiplier" strRed Word64,
-  Integral b, FiniteBits b) =>
-  b -> strRed -> b
-rem32' a rhs = snd $ divRem32 a rhs
+{-# INLINE rem #-}
+rem ::
+  ( HasField "divisor" strRed b
+  , HasField "multiplier" strRed w
+  , Integral b, FiniteBits b,  Integral w, FiniteBits (Half w), Bits w
+  ) => b -> strRed -> b
+rem a rhs = snd $ divRem a rhs
 
 {-# INLINE lower128 #-}
 lower128 :: Word128 -> Word128
