@@ -59,12 +59,15 @@ divRem64 dividend divis =
       in (quotient, remainder)
 
 {-# INLINE divRem #-}
+{-# SPECIALIZE divRem :: Word64 -> StrengthReducedW64 -> (Word64, Word64) #-}
+{-# SPECIALIZE divRem :: Word32 -> StrengthReducedW32 -> (Word32, Word32) #-}
 divRem :: forall strRed a b.
   ( HasField "divisor" strRed a
   , HasField "multiplier" strRed b
   , Num a
   , Integral a
-  , FiniteBits a, Num b, Eq b, Integral b, FiniteBits (Half b), Bits b) => a -> strRed -> (a, a)
+  , FiniteBits a, Num b, Eq b, Integral b, FiniteBits (Half b), Bits b
+  ) => a -> strRed -> (a, a)
 divRem dividend divis =
   case getField @"multiplier" divis of
     0 ->
@@ -82,6 +85,7 @@ divRem dividend divis =
         remainder = dividend - quotient * getField @"divisor" divis
       in (quotient, remainder)
 
+{-# INLINE new #-}
 new :: (Ord t, Num t, Bits t, Integral t, Bounded t, Num (Multiplier t), Bounded (Multiplier t), Integral (Multiplier t)) => ((Multiplier t) -> t -> a) -> t -> a
 new con divi =
   assert (divi > 0) $
@@ -104,6 +108,8 @@ rem64 :: (HasField "divisor" r b, HasField "multiplier" r Word128,
 rem64 a rhs = snd $ divRem64 a rhs
 
 {-# INLINE div' #-}
+{-# SPECIALIZE div' :: Word64 -> StrengthReducedW64 -> Word64 #-}
+{-# SPECIALIZE div' :: Word32 -> StrengthReducedW32 -> Word32 #-}
 div' ::
   ( HasField "divisor" strRed b
   , HasField "multiplier" strRed w
@@ -145,12 +151,12 @@ type family Half a where
   Half Word128 = Word64
   Half Word64 = Word32
   Half Word32 = Word16
-  Half Word16  = Word8
+  Half Word16 = Word8
 
 data StrengthReducedW64 = StrengthReducedW64 { multiplier :: {-# UNPACK #-} !Word128, divisor :: {-# UNPACK #-} !Word64 }
-data StrengthReducedW32 = StrengthReducedW32 { multiplier :: {-# UNPACK #-} !Word64, divisor :: {-# UNPACK #-} !Word32 }
-data StrengthReducedW16 = StrengthReducedW16 { multiplier :: {-# UNPACK #-} !Word32, divisor :: {-# UNPACK #-} !Word16 }
-data StrengthReducedW8  = StrengthReducedW7  { multiplier :: {-# UNPACK #-} !Word16 , divisor :: {-# UNPACK #-} !Word8  }
+data StrengthReducedW32 = StrengthReducedW32 { multiplier :: {-# UNPACK #-} !Word64,  divisor :: {-# UNPACK #-} !Word32 }
+data StrengthReducedW16 = StrengthReducedW16 { multiplier :: {-# UNPACK #-} !Word32,  divisor :: {-# UNPACK #-} !Word16 }
+data StrengthReducedW8  = StrengthReducedW7  { multiplier :: {-# UNPACK #-} !Word16,  divisor :: {-# UNPACK #-} !Word8  }
 
 data StrengthReducedW128 = StrengthReducedW128
   { multiplierHi :: {-#UNPACK #-} !Word128
