@@ -9,30 +9,30 @@ Good compilers already perform this optimization for divisors that are known at 
 All
   atrophy
     Word64
-      new64:                OK (0.30s)
-        67.4 ns ± 2.9 ns
-      div 10000 uniques:    OK (0.18s)
-        1.38 ms ± 119 μs
-      div 10000, 1 divisor: OK (0.46s)
-        216  μs ± 6.8 μs
+      new:                  OK (1.38s)
+        40.9 ns ± 330 ps
+      div 10000 uniques:    OK (3.82s)
+        929  μs ± 5.7 μs
+      div 10000, 1 divisor: OK (1.81s)
+        219  μs ± 3.2 μs
     Word32
-      new:                  OK (0.17s)
-        10.2 ns ± 652 ps
-      div 10000 uniques:    OK (0.60s)
-        275  μs ± 8.4 μs
-      div 10000, 1 divisor: OK (0.21s)
-        209  μs ±  20 μs
+      new:                  OK (0.77s)
+        11.4 ns ± 162 ps
+      div 10000 uniques:    OK (0.89s)
+        433  μs ± 6.4 μs
+      div 10000, 1 divisor: OK (13.59s)
+        208  μs ± 1.2 μs
   ghc
     Word64
-      div 10000 uniques:    OK (0.58s)
-        265  μs ±  14 μs
-      div 10000, 1 divisor: OK (0.53s)
-        247  μs ± 6.8 μs
+      div 10000 uniques:    OK (2.12s)
+        253  μs ± 2.8 μs
+      div 10000, 1 divisor: OK (2.05s)
+        248  μs ± 2.8 μs
     Word32
-      div 10000 uniques:    OK (0.57s)
-        263  μs ± 5.9 μs
-      div 10000, 1 divisor: OK (0.53s)
-        251  μs ±  21 μs
+      div 10000 uniques:    OK (2.15s)
+        255  μs ± 3.4 μs
+      div 10000, 1 divisor: OK (2.12s)
+        255  μs ± 2.6 μs
 ```
 
 there is a *lot* of room for improvement, but atrophy does outperform `div` in the best case.
