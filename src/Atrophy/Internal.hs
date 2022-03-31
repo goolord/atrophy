@@ -85,6 +85,7 @@ divRem dividend divis =
       in (quotient, remainder)
 
 {-# INLINE new #-}
+{-# SPECIALIZE new :: (Word64 -> Word32 -> StrengthReducedW32) -> Word32 -> StrengthReducedW32 #-}
 new :: (Ord t, Num t, Bits t, Integral t, Bounded t, Num (Multiplier t), Bounded (Multiplier t), Integral (Multiplier t)) => ((Multiplier t) -> t -> a) -> t -> a
 new con divi =
   assert (divi > 0) $
@@ -95,19 +96,20 @@ new con divi =
     in con (quotient + 1) divi
 
 {-# INLINE div64 #-}
+{-# SPECIALIZE div64 :: Word64 -> StrengthReducedW64 -> Word64 #-}
 div64 :: (HasField "divisor" r b, HasField "multiplier" r Word128,
  Integral b, FiniteBits b) =>
   b -> r -> b
 div64 a rhs = fst $ divRem64 a rhs
 
 {-# INLINE rem64 #-}
+{-# SPECIALIZE rem64 :: Word64 -> StrengthReducedW64 -> Word64 #-}
 rem64 :: (HasField "divisor" r b, HasField "multiplier" r Word128,
  Integral b, FiniteBits b) =>
   b -> r -> b
 rem64 a rhs = snd $ divRem64 a rhs
 
 {-# INLINE div' #-}
-{-# SPECIALIZE div' :: Word64 -> StrengthReducedW64 -> Word64 #-}
 {-# SPECIALIZE div' :: Word32 -> StrengthReducedW32 -> Word32 #-}
 div' ::
   ( HasField "divisor" strRed b
@@ -115,13 +117,14 @@ div' ::
   , Integral b, FiniteBits b,  Integral w, FiniteBits (Half w), Bits w, Integral (Half w)) => b -> strRed -> b
 div' a rhs = fst $ divRem a rhs
 
-{-# INLINE rem #-}
-rem ::
+{-# INLINE rem' #-}
+{-# SPECIALIZE rem' :: Word32 -> StrengthReducedW32 -> Word32 #-}
+rem' ::
   ( HasField "divisor" strRed b
   , HasField "multiplier" strRed w
   , Integral b, FiniteBits b,  Integral w, FiniteBits (Half w), Integral (Half w), Bits w
   ) => b -> strRed -> b
-rem a rhs = snd $ divRem a rhs
+rem' a rhs = snd $ divRem a rhs
 
 {-# INLINE lower128 #-}
 lower128 :: Word128 -> Word128
