@@ -66,7 +66,6 @@ divRem64 dividend divis =
       in (quotient, remainder)
 
 {-# INLINE divRem #-}
-{-# SPECIALIZE divRem :: Word64 -> StrengthReducedW64 -> (Word64, Word64) #-}
 {-# SPECIALIZE divRem :: Word32 -> StrengthReducedW32 -> (Word32, Word32) #-}
 divRem :: forall strRed a b.
   ( HasField "divisor" strRed a
@@ -141,12 +140,14 @@ upper128 :: Word128 -> Word128
 upper128 (Word128 hi _low) = Word128 0 hi
 
 {-# INLINE lowerHalf #-}
-lowerHalf :: forall w. (Num w, Integral w, Integral (Half w)) => w -> w
-lowerHalf w = fromIntegral $ fromIntegral @_ @(Half w) w
+lowerHalf :: forall w. (Num w, Integral w, Integral (Half w), FiniteBits (Half w), Bits w) => w -> w
+lowerHalf w = (w `unsafeShiftL` halfSize) `unsafeShiftR` halfSize
+  where
+  halfSize = finiteBitSize @(Half w) zeroBits
 
 {-# INLINE upperHalf #-}
 upperHalf :: forall w. (Integral w, Bits w, FiniteBits (Half w), Integral (Half w)) => w -> w
-upperHalf w = lowerHalf $ w `unsafeShiftR` (finiteBitSize @(Half w) zeroBits)
+upperHalf w = w `unsafeShiftR` (finiteBitSize @(Half w) zeroBits)
 
 type family Multiplier a where
   Multiplier Word64 = Word128
