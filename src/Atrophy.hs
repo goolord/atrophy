@@ -1,10 +1,10 @@
 module Atrophy
   ( module REXPORT
   , StrengthReducedW128 (..)
-  , StrengthReducedW8 (..)
   , StrengthReducedW64 (..)
   , StrengthReducedW32 (..)
   , StrengthReducedW16 (..)
+  , StrengthReducedW8 (..)
   ) where
 
 import Atrophy.LongDivision as REXPORT

@@ -14,6 +14,7 @@
 {-# OPTIONS_GHC
     -fno-warn-orphans
 #-}
+{-# LANGUAGE DerivingStrategies #-}
 
 module Main where
 
@@ -33,6 +34,11 @@ instance NFData StrengthReducedW64
 
 deriving instance Generic StrengthReducedW32
 instance NFData StrengthReducedW32
+
+instance (Bounded a, Num a, UniformRange a) => Uniform (NonZero a) where
+  uniformM g = NonZero <$> uniformRM (1, maxBound) g
+
+deriving newtype instance NFData a => NFData (NonZero a)
 
 manyRandom :: forall a. (Uniform a, NFData a) => IO [a]
 manyRandom = uniformListM 10_000 globalStdGen
@@ -69,13 +75,13 @@ ghcBench _ =
       pure $ fmap (\dividend' -> dividend' `div` divisor') dividends
   ]
 
-atrophyBench :: forall base sr out. (NFData base, Uniform base, NFData sr, NFData out, Random base, Num base, Bounded base) => (base -> sr -> out) -> (base -> sr) -> [Benchmark]
+atrophyBench :: forall base sr out. (NFData base, Uniform base, UniformRange base, NFData sr, NFData out, Random base, Num base, Bounded base) => (base -> sr -> out) -> (NonZero base -> sr) -> [Benchmark]
 atrophyBench divF newF =
   [ randomEnv (uniformM globalStdGen) $ \divisor' ->
       bench "new" $ nf newF divisor'
   , randomEnv (manyRandom @(base, base)) $ \somePairs ->
-      bench "div 10000 uniques" $ nf (fmap (\(x, y) -> x `divF` newF y)) somePairs
-  , randomEnv' ((,) <$> (newF <$> randomRIO (1, maxBound)) <*> manyRandom @base) $ \x -> bench "div 10000, 1 divisor" $ nfIO $ do 
+      bench "div 10000 uniques" $ nf (fmap (\(x, y) -> x `divF` newF (NonZero y))) somePairs
+  , randomEnv' ((,) <$> (newF <$> (NonZero <$> randomRIO (1, maxBound))) <*> manyRandom @base) $ \x -> bench "div 10000, 1 divisor" $ nfIO $ do 
       (divisor', dividends) <- x
       pure $ fmap (\dividend' -> dividend' `divF` divisor') dividends
   ]

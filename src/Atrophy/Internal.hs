@@ -8,6 +8,8 @@
   , BangPatterns
   , NumericUnderscores
   , ScopedTypeVariables
+  , DerivingStrategies
+  , GeneralizedNewtypeDeriving
 #-}
 
 module Atrophy.Internal where
@@ -15,18 +17,23 @@ module Atrophy.Internal where
 import Data.WideWord.Word128
 import Data.Bits
 import Atrophy.Internal.LongDivision
-import Control.Exception (assert)
 import GHC.Records
 import Data.Word
+
+newtype NonZero a = NonZero a
+  deriving newtype (Num, Show)
+
+instance (Bounded a, Num a) => Bounded (NonZero a) where
+  minBound = 1
+  maxBound = NonZero maxBound
 
 {-# INLINE isPowerOf2 #-}
 isPowerOf2 :: (Bits a, Num a) => a -> Bool
 isPowerOf2 x = (x .&. (x - 1)) == 0
 
 {-# INLINE new64 #-}
-new64 :: Word64 -> StrengthReducedW64
-new64 divi =
-  assert (divi > 0) $
+new64 :: NonZero Word64 -> StrengthReducedW64
+new64 (NonZero divi) =
   if isPowerOf2 divi
   then StrengthReducedW64 0 divi
   else
@@ -85,10 +92,9 @@ divRem dividend divis =
       in (quotient, remainder)
 
 {-# INLINE new #-}
-{-# SPECIALIZE new :: (Word64 -> Word32 -> StrengthReducedW32) -> Word32 -> StrengthReducedW32 #-}
-new :: (Ord t, Num t, Bits t, Integral t, Bounded t, Num (Multiplier t), Bounded (Multiplier t), Integral (Multiplier t)) => ((Multiplier t) -> t -> a) -> t -> a
-new con divi =
-  assert (divi > 0) $
+{-# SPECIALIZE new :: (Word64 -> Word32 -> StrengthReducedW32) -> NonZero Word32 -> StrengthReducedW32 #-}
+new :: (Ord t, Num t, Bits t, Integral t, Bounded t, Num (Multiplier t), Bounded (Multiplier t), Integral (Multiplier t)) => ((Multiplier t) -> t -> a) -> (NonZero t) -> a
+new con (NonZero divi) =
   if isPowerOf2 divi
   then con 0 divi
   else

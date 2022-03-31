@@ -3,12 +3,16 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DerivingVia #-}
 
 module Main (main) where
 
-import Test.QuickCheck
+import Test.QuickCheck hiding (NonZero)
 import Test.Tasty
-import Test.Tasty.QuickCheck
+import Test.Tasty.QuickCheck hiding (NonZero)
+import qualified Test.Tasty.QuickCheck as QC (NonZero(..))
 import Data.WideWord.Word128
 import Data.WideWord.Word256
 import Atrophy
@@ -24,6 +28,8 @@ tests =
 
 instance Arbitrary Word128 where
   arbitrary = Word128 <$> arbitrary <*> arbitrary
+
+deriving via (QC.NonZero a) instance (Num a, Eq a, Arbitrary a) => Arbitrary (NonZero a)
 
 -- wrong
 naiveMultiply256By128UpperBits :: Word128 -> Word128 -> Word128 -> Word128
@@ -58,12 +64,12 @@ unitTests = testGroup "Unit tests"
   ]
 
 ourDiv64 :: NonZero Word64 -> NonZero Word64 -> Word64
-ourDiv64 (NonZero dividend) (NonZero divi) =
+ourDiv64 (NonZero dividend) divi =
   let sr = new64 divi
   in div64 dividend sr
 
 ourDiv32 :: NonZero Word32 -> NonZero Word32 -> Word32
-ourDiv32 (NonZero dividend) (NonZero divi) =
+ourDiv32 (NonZero dividend) divi =
   let sr = new StrengthReducedW32 divi
   in div' dividend sr
 
