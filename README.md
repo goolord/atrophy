@@ -35,6 +35,8 @@ All
         255  μs ± 2.6 μs
 ```
 
+note: performance is *heavily* platform dependant.
+
 there is a *lot* of room for improvement, but atrophy does outperform `div` in the best case.
 the rust library this is based off of has much more impressive benchmarks, though I suspect llvm is doing a lot of heavy lifting
 
