@@ -27,7 +27,7 @@ library
       Atrophy.Internal
       Atrophy.Internal.LongDivision
   -- other-extensions:
-  ghc-options: -Wall -O2
+  ghc-options: -Wall -O2 -Wredundant-constraints
   build-depends:
       base >=4.10.0.0 && <5
     , wide-word

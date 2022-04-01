@@ -44,7 +44,6 @@ new64 (NonZero divi) =
 divRem64 ::
   ( HasField "divisor" strRed a
   , HasField "multiplier" strRed Word128
-  , Num a
   , Integral a
   , FiniteBits a
   ) => a -> strRed -> (a, a)
@@ -70,9 +69,8 @@ divRem64 dividend divis =
 divRem :: forall strRed a b.
   ( HasField "divisor" strRed a
   , HasField "multiplier" strRed b
-  , Num a
   , Integral a
-  , FiniteBits a, Num b, Eq b, Integral b, FiniteBits (Half b), Bits b, Integral (Half b)) => a -> strRed -> (a, a)
+  , FiniteBits a, Integral b, FiniteBits (Half b), Bits b) => a -> strRed -> (a, a)
 divRem dividend divis =
   case getField @"multiplier" divis of
     0 ->
@@ -92,7 +90,7 @@ divRem dividend divis =
 
 {-# INLINE new #-}
 {-# SPECIALIZE new :: (Word64 -> Word32 -> StrengthReducedW32) -> NonZero Word32 -> StrengthReducedW32 #-}
-new :: (Ord t, Num t, Bits t, Integral t, Bounded t, Num (Multiplier t), Bounded (Multiplier t), Integral (Multiplier t)) => ((Multiplier t) -> t -> a) -> (NonZero t) -> a
+new :: (Bits t, Integral t, Bounded (Multiplier t), Integral (Multiplier t)) =>((Multiplier t) -> t -> a) -> (NonZero t) -> a
 new con (NonZero divi) =
   if isPowerOf2 divi
   then con 0 divi
@@ -119,7 +117,7 @@ rem64 a rhs = snd $ divRem64 a rhs
 div' ::
   ( HasField "divisor" strRed b
   , HasField "multiplier" strRed w
-  , Integral b, FiniteBits b,  Integral w, FiniteBits (Half w), Bits w, Integral (Half w)) => b -> strRed -> b
+  , Integral b, FiniteBits b,  Integral w, FiniteBits (Half w), Bits w) => b -> strRed -> b
 div' a rhs = fst $ divRem a rhs
 
 {-# INLINE rem' #-}
@@ -127,7 +125,7 @@ div' a rhs = fst $ divRem a rhs
 rem' ::
   ( HasField "divisor" strRed b
   , HasField "multiplier" strRed w
-  , Integral b, FiniteBits b,  Integral w, FiniteBits (Half w), Integral (Half w), Bits w
+  , Integral b, FiniteBits b,  Integral w, FiniteBits (Half w), Bits w
   ) => b -> strRed -> b
 rem' a rhs = snd $ divRem a rhs
 
@@ -140,14 +138,16 @@ upper128 :: Word128 -> Word128
 upper128 (Word128 hi _low) = Word128 0 hi
 
 {-# INLINE lowerHalf #-}
-lowerHalf :: forall w. (Num w, Integral w, Integral (Half w), FiniteBits (Half w), Bits w) => w -> w
+lowerHalf :: forall w. ( FiniteBits (Half w), Bits w) =>w -> w
 lowerHalf w = (w `unsafeShiftL` halfSize) `unsafeShiftR` halfSize
   where
   halfSize = finiteBitSize @(Half w) zeroBits
 
 {-# INLINE upperHalf #-}
-upperHalf :: forall w. (Integral w, Bits w, FiniteBits (Half w), Integral (Half w)) => w -> w
-upperHalf w = w `unsafeShiftR` (finiteBitSize @(Half w) zeroBits)
+upperHalf :: forall w. ( Bits w, FiniteBits (Half w)) =>w -> w
+upperHalf w = w `unsafeShiftR` halfSize
+  where
+  halfSize = finiteBitSize @(Half w) zeroBits
 
 type family Multiplier a where
   Multiplier Word64 = Word128
