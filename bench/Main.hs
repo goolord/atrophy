@@ -1,87 +1,175 @@
-{-# LANGUAGE
-    BangPatterns
-  , GADTs
-  , DeriveGeneric
-  , StandaloneDeriving
-  , MagicHash
-  , DataKinds
-  , GeneralizedNewtypeDeriving
-  , TypeApplications
-  , ScopedTypeVariables
-  , NumericUnderscores
-#-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ExplicitNamespaces #-}
 
-{-# OPTIONS_GHC
-    -fno-warn-orphans
-#-}
-{-# LANGUAGE DerivingStrategies #-}
+module Main (main) where
 
-module Main where
-
-import Test.Tasty.Bench (bench, bgroup, defaultMain, nf, Benchmark, envWithCleanup, nfIO)
-import Control.DeepSeq (NFData, force)
 import Atrophy
-import GHC.Generics
-import Data.Word (Word64, Word32)
-import Control.Exception (evaluate)
-import Test.Tasty (withResource)
-import System.Mem (performMajorGC)
+import Control.DeepSeq (NFData (..))
+import Control.Monad (replicateM)
+import Control.Monad.ST (runST)
+import Data.Bits
+import Data.Primitive.PrimArray
+import Data.Primitive.SmallArray
+import Data.WideWord.Word128
+import Data.Primitive.Types (Prim)
+import Data.Word
+import GHC.TypeNats (type (-), type (^))
 import System.Random.Stateful
-import Data.Proxy (Proxy (Proxy))
+import Test.Tasty.Bench
 
-deriving instance Generic StrengthReducedW64
-instance NFData StrengthReducedW64
+size :: Int
+size = 10000
 
-deriving instance Generic StrengthReducedW32
-instance NFData StrengthReducedW32
+-- | Dividends, divisors (never zero) and one fixed divisor.
+data Env a = Env !(PrimArray a) !(PrimArray a) !a
 
-instance (Bounded a, Num a, UniformRange a) => Uniform (NonZero a) where
-  uniformM g = NonZero <$> uniformRM (1, maxBound) g
+instance NFData (Env a) where
+  rnf !_ = ()
 
-deriving newtype instance NFData a => NFData (NonZero a)
+-- | Precomputed divisors, for the known-numerator benchmarks.
+newtype Reduced a = Reduced (SmallArray (StrengthReduced a))
 
-manyRandom :: forall a. (Uniform a, NFData a) => IO [a]
-manyRandom = uniformListM 10_000 globalStdGen
+instance NFData (Reduced a) where
+  rnf (Reduced !_) = ()
 
-randomEnv :: NFData b => IO b
-  -> (b -> Benchmark)
-  -> Benchmark
-randomEnv a = envWithCleanup (a >>= evaluate . force) (const performMajorGC)
+class (Prim a, Integral a, FiniteBits a, Bounded a, StrengthReduce a) => BenchWord a where
+  uniformW :: StdGen -> (a, StdGen)
 
-randomEnv' :: NFData b => IO b
-  -> (IO b -> Benchmark)
-  -> Benchmark
-randomEnv' a = withResource (a >>= evaluate . force) (const performMajorGC)
+instance BenchWord Word32 where uniformW = uniform
+instance BenchWord Word64 where uniformW = uniform
+instance BenchWord Word128 where
+  uniformW g0 = let (h, g1) = uniform g0; (l, g2) = uniform g1 in (Word128 h l, g2)
+
+-- | Dividends are uniform. Divisors have a uniform bit length, then are uniform
+-- within it: this exercises both small and large quotients, which matters for
+-- hardware division latency.
+mkEnv :: forall a. BenchWord a => IO (Env a)
+mkEnv = do
+  let g0 = mkStdGen 2026
+      (ns, g1) = go size g0 []
+      (ds, g2) = goD size g1 []
+      (d, _) = goD 1 g2 []
+  pure $ Env (primArrayFromList ns) (primArrayFromList ds) (sum d)
+  where
+  go 0 g acc = (acc, g)
+  go k g acc = let (x, g') = uniformW g in go (k - 1 :: Int) g' (x : acc)
+  goD 0 g acc = (acc, g)
+  goD k g acc =
+    let (bitsLen, g') = uniformR (1, finiteBitSize (0 :: a)) g
+        (x, g'') = uniformW g'
+    in goD (k - 1 :: Int) g'' (max 1 (x `shiftR` (finiteBitSize (0 :: a) - bitsLen)) : acc)
+
+-- | A small table, so that the benchmark measures division rather than cache
+-- misses on 10000 boxed values.
+tableSize :: Int
+tableSize = 64
+
+mkReduced :: BenchWord a => Env a -> Reduced a
+mkReduced (Env _ ds _) = Reduced $ runST $ do
+  arr <- newSmallArray tableSize undefined
+  let go i | i == tableSize = pure ()
+           | otherwise = (writeSmallArray arr i $! new (NonZero (indexPrimArray ds i))) >> go (i + 1)
+  go 0
+  unsafeFreezeSmallArray arr
+
+{-# INLINE sumMap #-}
+sumMap :: (Prim a, Num a) => (a -> a) -> PrimArray a -> a
+sumMap f = foldlPrimArray' (\acc x -> acc + f x) 0
+
+{-# INLINE sumIx #-}
+sumIx :: Num a => (Int -> a) -> a
+sumIx f = go 0 0
+  where
+  go !i !acc
+    | i == size = acc
+    | otherwise = go (i + 1) (acc + f i)
+
+{-# INLINE sumReduced #-}
+sumReduced :: Num a => (StrengthReduced a -> a) -> Reduced a -> a
+sumReduced f (Reduced arr) = sumIx (\i -> f (indexSmallArray arr (i .&. (tableSize - 1))))
+
+{-# NOINLINE runtime #-}
+runtime :: a -> a
+runtime x = x
 
 main :: IO ()
-main = do
-  defaultMain $
-    [ bgroup "atrophy"
-        [ bgroup "Word64" $ atrophyBench div64 new64
-        , bgroup "Word32" $ atrophyBench div' (new StrengthReducedW32)
-        ]
-    , bgroup "ghc"
-        [ bgroup "Word64" $ ghcBench (Proxy @Word64)
-        , bgroup "Word32" $ ghcBench (Proxy @Word32)
-        ]
-    ]
-
-ghcBench :: forall a. (NFData a, Uniform a, Integral a, Random a, Bounded a) => Proxy a -> [Benchmark]
-ghcBench _ =
-  [ randomEnv (manyRandom @(a, a)) $ \somePairs ->
-      bench "div 10000 uniques" $ nf (\xs -> fmap (\(x, y) -> x `div` y) xs) somePairs
-  , randomEnv' ((,) <$> randomRIO (1, maxBound) <*> manyRandom @a) $ \x -> bench "div 10000, 1 divisor" $ nfIO $ do 
-      (divisor', dividends) <- x
-      pure $ fmap (\dividend' -> dividend' `div` divisor') dividends
+main = defaultMain
+  [ bgroup "Word64" $ runtimeBenches @Word64 ++
+      [ env (mkEnv @Word64) $ \ ~(Env ns _ _) -> bgroup "known divisor 7"
+          [ bench "ghc quot" $ whnf (sumMap (`quot` 7)) ns
+          , bench "atrophy divK" $ whnf (sumMap (divK @7)) ns
+          , bench "atrophy div' (runtime)" $ whnf (\sr -> sumMap (`div'` sr) ns) (new (NonZero (runtime 7)))
+          ]
+      , env (mkEnv @Word64) $ \ ~(Env ns _ _) -> bgroup "known divisor 1000000007"
+          [ bench "ghc quot" $ whnf (sumMap (`quot` 1000000007)) ns
+          , bench "atrophy divK" $ whnf (sumMap (divK @1000000007)) ns
+          ]
+      , env (mkEnv @Word64) $ \ ~(e@(Env _ ds _)) -> env (pure (mkReduced e)) $ \rs -> bgroup "known numerator 2^63"
+          [ bench "ghc quot" $ whnf (sumMap (quot (2 ^ (63 :: Int)))) ds
+          , bench "atrophy divNonZeroN" $ whnf (sumMap (divNonZeroN @(2 ^ 63) . NonZero)) ds
+          , bench "atrophy div' (runtime)" $ whnf (\n -> sumReduced (div' n) rs) (runtime (2 ^ (63 :: Int)))
+          , bench "atrophy divN" $ whnf (sumReduced (divN @(2 ^ 63))) rs
+          ]
+      , env (mkEnv @Word64) $ \ ~(e@(Env _ ds _)) -> env (pure (mkReduced e)) $ \rs -> bgroup "known numerator 1000000"
+          [ bench "ghc quot" $ whnf (sumMap (quot 1000000)) ds
+          , bench "atrophy divNonZeroN" $ whnf (sumMap (divNonZeroN @1000000 . NonZero)) ds
+          , bench "atrophy div' (runtime)" $ whnf (\n -> sumReduced (div' n) rs) (runtime 1000000)
+          , bench "atrophy divN" $ whnf (sumReduced (divN @1000000)) rs
+          ]
+      , env (mkEnv @Word64) $ \ ~(e@(Env _ ds _)) -> env (pure (mkReduced e)) $ \rs -> bgroup "known numerator maxBound"
+          [ bench "ghc quot" $ whnf (sumMap (quot maxBound)) ds
+          , bench "atrophy div' (runtime)" $ whnf (\n -> sumReduced (div' n) rs) (runtime maxBound)
+          , bench "atrophy divN" $ whnf (sumReduced (divN @(2 ^ 64 - 1))) rs
+          ]
+      , env mkLimbs $ \ ~(ls, d) -> bgroup "long division 64 limbs"
+          [ bench "Integer quotRem" $ whnf (\n -> n `quotRem` fromIntegral d) (limbsToInteger ls)
+          , bench "atrophy longDivision" $ whnf (\dv -> runST $ do
+              q <- newPrimArray 64
+              longDivision dv ls q) (newDivisor2By1 (NonZero d))
+          ]
+      ]
+  , bgroup "Word32" $ runtimeBenches @Word32 ++
+      [ env (mkEnv @Word32) $ \ ~(Env ns _ _) -> bgroup "known divisor 7"
+          [ bench "ghc quot" $ whnf (sumMap (`quot` 7)) ns
+          , bench "atrophy divK" $ whnf (sumMap (divK @7)) ns
+          ]
+      ]
+  , bgroup "Word128" $ runtimeBenches @Word128 ++
+      [ env (mkEnv @Word128) $ \ ~(Env ns _ _) -> bgroup "known divisor 10^19"
+          [ bench "wide-word quot" $ whnf (sumMap (`quot` 10000000000000000000)) ns
+          , bench "atrophy divK" $ whnf (sumMap (divK @10000000000000000000)) ns
+          ]
+      , env (mkEnv @Word128) $ \ ~(e@(Env _ ds _)) -> env (pure (mkReduced e)) $ \rs -> bgroup "known numerator 10^18"
+          [ bench "wide-word quot" $ whnf (sumMap (quot 1000000000000000000)) ds
+          , bench "atrophy divNonZeroN" $ whnf (sumMap (divNonZeroN @1000000000000000000 . NonZero)) ds
+          , bench "atrophy div' (runtime)" $ whnf (\n -> sumReduced (div' n) rs) (runtime 1000000000000000000)
+          , bench "atrophy divN" $ whnf (sumReduced (divN @1000000000000000000)) rs
+          ]
+      ]
   ]
 
-atrophyBench :: forall base sr out. (NFData base, Uniform base, UniformRange base, NFData sr, NFData out, Random base, Num base, Bounded base) => (base -> sr -> out) -> (NonZero base -> sr) -> [Benchmark]
-atrophyBench divF newF =
-  [ randomEnv (uniformM globalStdGen) $ \divisor' ->
-      bench "new" $ nf newF divisor'
-  , randomEnv (manyRandom @(base, base)) $ \somePairs ->
-      bench "div 10000 uniques" $ nf (fmap (\(x, y) -> x `divF` newF (NonZero y))) somePairs
-  , randomEnv' ((,) <$> (newF <$> (NonZero <$> randomRIO (1, maxBound))) <*> manyRandom @base) $ \x -> bench "div 10000, 1 divisor" $ nfIO $ do 
-      (divisor', dividends) <- x
-      pure $ fmap (\dividend' -> dividend' `divF` divisor') dividends
+runtimeBenches :: forall a. BenchWord a => [Benchmark]
+runtimeBenches =
+  [ env (mkEnv @a) $ \ ~(Env _ _ d) -> bench "new" $ whnf new (NonZero d)
+  , env (mkEnv @a) $ \ ~(Env ns _ d) -> bgroup "fixed divisor"
+      [ bench "baseline quot" $ whnf (\dv -> sumMap (`quot` dv) ns) d
+      , bench "atrophy divNonZero" $ whnf (\dv -> sumMap (`divNonZero` dv) ns) (NonZero d)
+      , bench "atrophy div'" $ whnf (\sr -> sumMap (`div'` sr) ns) (new (NonZero d))
+      , bench "atrophy rem'" $ whnf (\sr -> sumMap (`rem'` sr) ns) (new (NonZero d))
+      ]
+  , env (mkEnv @a) $ \ ~(Env ns ds _) -> bgroup "unique divisors"
+      [ bench "baseline quot" $ whnf (\xs -> sumIx (\i -> indexPrimArray xs i `quot` indexPrimArray ds i)) ns
+      , bench "atrophy div' . new" $ whnf (\xs -> sumIx (\i -> indexPrimArray xs i `div'` new (NonZero (indexPrimArray ds i)))) ns
+      ]
   ]
+
+mkLimbs :: IO (PrimArray Word64, Word64)
+mkLimbs = do
+  g <- newIOGenM (mkStdGen 7)
+  ls <- replicateM 64 (uniformM g)
+  d <- uniformRM (1, maxBound) g
+  pure (primArrayFromList ls, d)
+
+limbsToInteger :: PrimArray Word64 -> Integer
+limbsToInteger = foldrPrimArray (\l acc -> acc * 2 ^ (64 :: Int) + toInteger l) 0
